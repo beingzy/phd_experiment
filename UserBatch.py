@@ -86,6 +86,10 @@ class UserBatch(object):
         
     def load_friends(self, x):
         """ Load friendship dataframe
+
+            Parameters:
+            ----------
+            x: DataFrame, columns = ["pair", "uid_a", "uid_b"]
         """
         self.friends = x
     
