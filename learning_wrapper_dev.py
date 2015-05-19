@@ -97,10 +97,9 @@ all_user_ids = list(set(users_df.ID))
 the_user_id = 0
 the_weights = ldm.get_transform_matrix()
 
-ks_user_ids = []
-ks_2t_pval = []
+ks_test_df = pd.DataFrame(columns = ["ID", "taste", "ks_pvalue"])
 
-for the_user_id in all_user_ids:
+for counter, the_user_id in enumerate(all_user_ids):
 	the_user_profile = users_df.ix[users_df.ID == the_user_id, cols].as_matrix()
 	the_user_taste   = users_df.ix[users_df.ID == the_user_id, "decision_style"].as_matrix()[0]
 
@@ -167,9 +166,14 @@ for the_user_id in all_user_ids:
 
 	## step07
 	## ks-test
-	ks_test = ks_2samp(sim_dist_vec, diff_dist_vec)
-	ks_user_ids.append(the_user_id)
-	ks_2t_pval.append(ks_test[1])
+	res_ks_test = ks_2samp(sim_dist_vec, diff_dist_vec)
+	ks_test_df.loc[counter] = [ the_user_id, the_user_taste, res_ks_test[1] ]
+
+
+## ################################### ##
+## 2nd round learning distance matrics ##
+## ################################### ##
+
 
 
 ## **************************************** ##
