@@ -104,6 +104,7 @@ class UserBatch(object):
     def update_sim_scorer(self, sim_score, index):
         """ Update 
         """
+        pass
     
     def cal_pairwise_distances(self):
         """ Calculate the pairwise distance (A2B & B2A) for all
