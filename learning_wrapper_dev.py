@@ -24,6 +24,7 @@ from UserBatch import SimScore, WeightedEuclidean, UserBatch
 from matplotlib import pyplot
 
 from scipy.stats import rayleigh
+from scipy.stats import ks_2samp
 from numpy import linspace
 
 ## ################## ##
@@ -85,10 +86,19 @@ ldm.fit(users_df[cols], friends_df.pair.as_matrix())
 ## step05: visualize the difference
 ## step06: fit with Rayleigh Distribution
 
+## parameters:
+## -----------
+## a. threshold for significance
+## b. minimum number of friends, if user having #friends LT min., is considered as majority
+##
+
 ## looping version
 all_user_ids = list(set(users_df.ID))
 the_user_id = 0
 the_weights = ldm.get_transform_matrix()
+
+ks_user_ids = []
+ks_2t_pval = []
 
 for the_user_id in all_user_ids:
 	the_user_profile = users_df.ix[users_df.ID == the_user_id, cols].as_matrix()
@@ -154,6 +164,12 @@ for the_user_id in all_user_ids:
 	file_name = "hist_id_%d.png" % the_user_id
 	pyplot.savefig(IMG_PATH + file_name, format='png')
 	pyplot.clf()
+
+	## step07
+	## ks-test
+	ks_test = ks_2samp(sim_dist_vec, diff_dist_vec)
+	ks_user_ids.append(the_user_id)
+	ks_2t_pval.append(ks_test[1])
 
 
 ## **************************************** ##
