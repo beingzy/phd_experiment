@@ -6,6 +6,19 @@ process
 Implement the initial iteration of learning by feeding
 the entire data set and tried to learn the weighting vector
 
+@dev_date: 05/24/2015
+@description:
+develop the iterative process following the initial learning:
+[swaping learning]
+a. pre-create two learning container to reprsent two
+   separate groups
+b. applying learned learning metrics to evaluate the
+   goodness of the assumption that a user is a memember
+   of taste group. if the evaluation test reject the
+   assumption, the tested user will be assigned to the
+   opposite group.
+c. repeat the process until the a criteria had been met
+
 
 
 @author: beingzy
@@ -109,6 +122,13 @@ ldm.fit(users_df[cols], friends_df.pair.as_matrix())
 ## a. hold them off from learning
 ## b. consider them from the majority
 
+## date: 05/23/2015
+## task: wrap the logics into a function
+## parameter define:
+is_plot = False
+image_name_prefix = "hist_id_"
+out_image_dir = IMG_PATH
+
 ## looping version
 all_user_ids = list(set(users_df.ID))
 the_user_id = 0
@@ -150,36 +170,37 @@ for counter, the_user_id in enumerate(all_user_ids):
 
 	## step05
 	##
-	_max = max(sim_dist_vec + diff_dist_vec)
-	_min = min(sim_dist_vec + diff_dist_vec)
-	_nbins = 50
-	bins = np.linspace(_min, _max, _nbins)
+	if isPlot:
+		_max = max(sim_dist_vec + diff_dist_vec)
+		_min = min(sim_dist_vec + diff_dist_vec)
+		_nbins = 50
+		bins = np.linspace(_min, _max, _nbins)
 
-	pyplot.hist(sim_dist_vec, bins, alpha=0.5, label='friends')
-	pyplot.hist(diff_dist_vec, bins, alpha=0.5, label='non-friends')
-	pyplot.legend(loc='upper right')
-	pyplot.title( "distance distrance of user (id: %d, taste: %d)" % (the_user_id, the_user_taste) )
+		pyplot.hist(sim_dist_vec, bins, alpha=0.5, label='friends')
+		pyplot.hist(diff_dist_vec, bins, alpha=0.5, label='non-friends')
+		pyplot.legend(loc='upper right')
+		pyplot.title( "distance distrance of user (id: %d, taste: %d)" % (the_user_id, the_user_taste) )
 
- 	## step06
-	## processing dist data
-	## exclude extreme small value
-	sim_dist_vec = [i for i in sim_dist_vec if i > 0.0001]
-	diff_dist_vec = [i for i in diff_dist_vec if i > 0.0001]
+ 		## step06
+		## processing dist data
+		## exclude extreme small value
+		sim_dist_vec = [i for i in sim_dist_vec if i > 0.0001]
+		diff_dist_vec = [i for i in diff_dist_vec if i > 0.0001]
 
-	friend_ray_param = rayleigh.fit(sim_dist_vec)
-	nonfriend_ray_param = rayleigh.fit(diff_dist_vec)
+		friend_ray_param = rayleigh.fit(sim_dist_vec)
+		nonfriend_ray_param = rayleigh.fit(diff_dist_vec)
 
-	x = linspace(_min, _max, 100)
-	# fitted distribution
-	f_rayleigh_pdf = rayleigh.pdf(x, loc=friend_ray_param[0],scale=friend_ray_param[1])
-	# original distribution
-	nf_rayleigh_pdf = rayleigh.pdf(x, loc=nonfriend_ray_param[0], scale=nonfriend_ray_param[1])
-	pyplot.plot(x, f_rayleigh_pdf ,'b-', x, nf_rayleigh_pdf ,'g-')
+		x = linspace(_min, _max, 100)
+		# fitted distribution
+		f_rayleigh_pdf = rayleigh.pdf(x, loc=friend_ray_param[0],scale=friend_ray_param[1])
+		# original distribution
+		nf_rayleigh_pdf = rayleigh.pdf(x, loc=nonfriend_ray_param[0], scale=nonfriend_ray_param[1])
+		pyplot.plot(x, f_rayleigh_pdf ,'b-', x, nf_rayleigh_pdf ,'g-')
 
-	#pyplot.show()
-	file_name = "hist_id_%d.png" % the_user_id
-	pyplot.savefig(IMG_PATH + file_name, format='png')
-	pyplot.clf()
+		#pyplot.show()
+		file_name = image_name_prefix + "%d.png" % the_user_id
+		pyplot.savefig(out_image_dir + file_name, format='png')
+		pyplot.clf()
 
 	## step07
 	## ks-test
@@ -230,6 +251,13 @@ g1 = ks_test_df.ID[ ks_test_df.ks_pvalue >  gamma ]
 ## friendship data having its both entities which is in the collection per pair
 friends_g0 = friends_df.ix[ friends_df.uid_a.isin(g0) & friends_df.uid_b.isin(g0) ]
 friends_g1 = friends_df.ix[ friends_df.uid_a.isin(g1) & friends_df.uid_b.isin(g1) ]
+
+## learning processing
+ldm_g0 = LDM()
+ldm_g1 = LDM()
+## ldm.fit(users_df[cols], friends_df.pair.as_matrix())
+ldm_g0.fit(users_df[cols], friends_g0.pair.as_matrix())
+ldm_g1.fit(users_df[cols], friends_g1.pair.as_matrix())
 ## strategy 01 results:
 ## g0: [0.4, 0.54, 0.0, 0.06, 0.0, 0.0]
 ## g1: [0.37, 0.63, 0.0, 0.0, 0.0, 0.0]
@@ -238,9 +266,3 @@ friends_g1 = friends_df.ix[ friends_df.uid_a.isin(g1) & friends_df.uid_b.isin(g1
 ## g0: [0.51, 0.32, 0.06, 0.08, 0.0, 0.02]
 ## g1: [0.4, 0.59, 0.0, 0.0, 0.0, 0.0]
 
-## learning processing
-ldm_g0 = LDM()
-ldm_g1 = LDM()
-## ldm.fit(users_df[cols], friends_df.pair.as_matrix())
-ldm_g0.fit(users_df[cols], friends_g0.pair.as_matrix())
-ldm_g1.fit(users_df[cols], friends_g1.pair.as_matrix())
