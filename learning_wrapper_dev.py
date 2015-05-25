@@ -44,11 +44,13 @@ from matplotlib import pyplot
 from scipy.stats import rayleigh
 from scipy.stats import ks_2samp
 from numpy import linspace
+from numpy.random import choice
 
 ## ################## ##
 ## Setup envinronment ##
 ## ################## ##
-ROOT_PATH = "/Users/beingzy/Documents/Projects/phd_experiment/"
+#ROOT_PATH = "/Users/beingzy/Documents/Projects/phd_experiment/"
+ROOT_PATH = "/home/beingzy/Documents/projects/phd_experiment/"
 DATA_PATH = ROOT_PATH + "data/sim_data_yi/"
 IMG_PATH  = ROOT_PATH + "images/"
 if os.getcwd() != ROOT_PATH:
@@ -86,7 +88,6 @@ friends_df.head(3)
 ##user_nx = UserBatch()
 ##user_nx.load_users(users_df)
 ##user_nx.load_friends(friends_df)
-
 ## Feed data into the Learning Distance Matrix Algorithm (LDM)
 cols = ["x0", "x1", "x2", "x3", "x4", "x5"]
 
@@ -124,88 +125,192 @@ ldm.fit(users_df[cols], friends_df.pair.as_matrix())
 
 ## date: 05/23/2015
 ## task: wrap the logics into a function
-## parameter define:
+
+## primary parameters:
+all_user_ids = list(set(users_df.ID))
+the_weights = ldm.get_transform_matrix()
+
+## secondary parameters:
 is_plot = False
 image_name_prefix = "hist_id_"
 out_image_dir = IMG_PATH
 
-## looping version
-all_user_ids = list(set(users_df.ID))
-the_user_id = 0
-the_weights = ldm.get_transform_matrix()
+def user_grouped_dist(user_id, weights, profile_df, friends_df):
+    """ Calculate distances between a user and whose friends
+        and distance between a user and whose non-friends.
+        The groupped distance vector will be output.
 
-ks_test_df = pd.DataFrame(columns = ["ID", "taste", "ks_pvalue"])
+        Parameters:
+        ----------
+        * user_id: {integer}, the target user's ID
+        * weights: {vector-like, float}, the vector of feature weights which
+            is extracted by LDM().fit(x, y).get_transform_matrix()
+        * profile_df: {matrix-like, pandas.DataFrame}, user profile dataframe
+            with columns: ["ID", "x0" - "xn"]
+        * friend_list: {matrix-like, pandas.DataFrame}, pandas.DataFrame store
+            pair of user ID(s) to represent connections with columns:
+            ["uid_a", "uid_b"]
 
-for counter, the_user_id in enumerate(all_user_ids):
-	the_user_profile = users_df.ix[users_df.ID == the_user_id, cols].as_matrix()
-	the_user_taste   = users_df.ix[users_df.ID == the_user_id, "decision_style"].as_matrix()[0]
+        Returns:
+        -------
+        res: {list, list of integers}, a list of two lists, which store the distances
+            of either friends and non-friends separately.
 
-	## step01
-	## handle user_id present in both columns (uid_a, uid_b)
-	#friends_id_ls = list(set(friends_df[friends_df.uid_a == the_user_id].uid_b.as_matrix()
-	#                         friends_df[friends_df.uid_b == the_user_id].uid_a.as_matrix()
-	#                         )
-	#                   )
-	friends_id_ls = friends_df[friends_df.uid_a == the_user_id].uid_b.as_matrix()
-	friends_id_ls = list(set(friends_id_ls))
-	## step02
-	## calculate the distance with friend-user
-	sim_dist_vec = []
-	for f_id in friends_id_ls:
-	    friend_profile = users_df.ix[users_df.ID == f_id, cols].as_matrix()
-	    the_dist = weighted_euclidean(the_user_profile, friend_profile, the_weights)
-	    sim_dist_vec.append(the_dist)
+        Examples:
+        ---------
+        weights = ldm().fit(df, friends_list).get_transform_matrix()
+        profile_df = users_df[["ID", cols]]
+        user_dist = user_grouped_dist(user_id = 0, weights = weights
+            , profile_df, friends_list)
+        print user_dist["friends"]
+        print user_dist["nonfriends"]
+    """
+    cols = [col for col in profile_df.columns if col is not "ID"]
+    # get the user profile information of the target users
+    user_profile = profile_df.ix[profile_df.ID == user_id, cols].as_matrix()
+    # get the user_id of friends of the target user
+    friends_ls_a = friends_df[friends_df.uid_a == user_id].uid_b.as_matrix()
+    friends_ls_b = friends_df[friends_df.uid_b == user_id].uid_a.as_matrix()
+    friends_ls = list(set(friends_ls_a)) + list(set(friends_ls_b))
+    # calculate the weighted distance of friends
+    sim_dist_vec = []
+    for f_id in friends_ls:
+        friend_profile = profile_df.ix[profile_df.ID == f_id, cols].as_matrix()
+        the_dist = weighted_euclidean(user_profile, friend_profile, weights)
+        sim_dist_vec.append(the_dist)
+    # calculate the weighted distances of non-friends
+    non_friends_ls = [ u for u in profile_df.ID if u not in friends_ls + [user_id] ]
+    diff_dist_vec = []
+    for nf_id in non_friends_ls:
+        nonfriend_profile = profile_df.ix[profile_df.ID == nf_id, cols].as_matrix()
+        the_dist = weighted_euclidean(user_profile, nonfriend_profile, weights)
+        diff_dist_vec.append(the_dist)
 
-	## step03
-	from numpy.random import choice
-	non_friends_id_ls = [u for u in users_df.ID if u not in friends_id_ls + the_user_id]
-	#non_friends_id_ls = choice()
+    res = [sim_dist_vec, diff_dist_vec]
+    return res
 
-	## step04
-	diff_dist_vec = []
-	for f_id in non_friends_id_ls:
-	    friend_profile = users_df.ix[users_df.ID == f_id, cols].as_matrix()
-	    the_dist = weighted_euclidean(the_user_profile, friend_profile, the_weights)
-	    diff_dist_vec.append(the_dist)
+def user_dist_kstest(sim_dist_vec, diff_dist_vec):
+    """ Test the goodness of a given weights to defferentiate friend distance
+        distributions and non-friend distance distributions of a given user.
+        The distance distribution is considered to follow Rayleigh distribution.
 
-	## step05
-	##
-	if isPlot:
-		_max = max(sim_dist_vec + diff_dist_vec)
-		_min = min(sim_dist_vec + diff_dist_vec)
-		_nbins = 50
-		bins = np.linspace(_min, _max, _nbins)
+        Parameters:
+        ----------
+        * sim_dist_vec: {vector-like (list), float}: distances between friends
+            and the user
+        * diff_dist_vec: {vector-like (list), float}: distances between non-friends
+            and the user
 
-		pyplot.hist(sim_dist_vec, bins, alpha=0.5, label='friends')
-		pyplot.hist(diff_dist_vec, bins, alpha=0.5, label='non-friends')
-		pyplot.legend(loc='upper right')
-		pyplot.title( "distance distrance of user (id: %d, taste: %d)" % (the_user_id, the_user_taste) )
+        Returns:
+        -------
+        * res: {float}: p-value of ks-test with assumption that distances follow
+            Rayleigh distribution.
 
- 		## step06
-		## processing dist data
-		## exclude extreme small value
-		sim_dist_vec = [i for i in sim_dist_vec if i > 0.0001]
-		diff_dist_vec = [i for i in diff_dist_vec if i > 0.0001]
+        Examples:
+        ---------
+        pval = user_dist_kstest(sim_dist_vec, diff_dist_vec)
+    """
+    _n = 100
+    friend_param = rayleigh.fit(sim_dist_vec)
+    nonfriend_param = rayleigh.fit(diff_dist_vec)
 
-		friend_ray_param = rayleigh.fit(sim_dist_vec)
-		nonfriend_ray_param = rayleigh.fit(diff_dist_vec)
+    samp_friend = rayleigh.rvs(friend_param[0], friend_param[1], _n)
+    samp_nonfriend = rayleigh.rvs(nonfriend_param[0], nonfriend_param[1], _n)
 
-		x = linspace(_min, _max, 100)
-		# fitted distribution
-		f_rayleigh_pdf = rayleigh.pdf(x, loc=friend_ray_param[0],scale=friend_ray_param[1])
-		# original distribution
-		nf_rayleigh_pdf = rayleigh.pdf(x, loc=nonfriend_ray_param[0], scale=nonfriend_ray_param[1])
-		pyplot.plot(x, f_rayleigh_pdf ,'b-', x, nf_rayleigh_pdf ,'g-')
+    ## ouput p-value of ks-test
+    res = ks_2samp(samp_friend, samp_nonfriend)[1]
+    return res
 
-		#pyplot.show()
-		file_name = image_name_prefix + "%d.png" % the_user_id
-		pyplot.savefig(out_image_dir + file_name, format='png')
-		pyplot.clf()
+def users_filter_by_weights():
+    """ Split a list of users into two groups, "valid group" and "invalid group",
+        with respect to the ks-test on the null hypothesis that friends'
+        weighted distance is significantly different from the couterpart of
+        non-friends. Assume the weighted distances of each group follow Rayleigh
+        distribution.
 
-	## step07
-	## ks-test
-	res_ks_test = ks_2samp(sim_dist_vec, diff_dist_vec)
-	ks_test_df.loc[counter] = [ the_user_id, the_user_taste, res_ks_test[1] ]
+        Parameters:
+        ----------
+        weights: {}
+
+        Returns:
+        -------
+
+        Examples:
+        --------
+
+    """
+
+
+
+    ## infunction variable
+    ks_test_df = pd.DataFrame(columns = ["ID", "taste", "ks_pvalue"])
+
+    for counter, the_user_id in enumerate(all_user_ids):
+    	the_user_profile = users_df.ix[users_df.ID == the_user_id, cols].as_matrix()
+    	the_user_taste   = users_df.ix[users_df.ID == the_user_id, "decision_style"].as_matrix()[0]
+
+    	## step01
+    	## handle user_id present in both columns (uid_a, uid_b)
+    	friends_id_ls = friends_df[friends_df.uid_a == the_user_id].uid_b.as_matrix()
+    	friends_id_ls = list(set(friends_id_ls))
+    	## step02
+    	## calculate the distance with friend-user
+    	sim_dist_vec = []
+    	for f_id in friends_id_ls:
+    	    friend_profile = users_df.ix[users_df.ID == f_id, cols].as_matrix()
+    	    the_dist = weighted_euclidean(the_user_profile, friend_profile, the_weights)
+    	    sim_dist_vec.append(the_dist)
+
+    	## step03
+    	##
+    	non_friends_id_ls = [u for u in users_df.ID if u not in friends_id_ls + the_user_id]
+    	#non_friends_id_ls = choice()
+
+    	## step04
+    	diff_dist_vec = []
+    	for f_id in non_friends_id_ls:
+    	    friend_profile = users_df.ix[users_df.ID == f_id, cols].as_matrix()
+    	    the_dist = weighted_euclidean(the_user_profile, friend_profile, the_weights)
+    	    diff_dist_vec.append(the_dist)
+
+    	## step05
+    	##
+    	if isPlot:
+    		_max = max(sim_dist_vec + diff_dist_vec)
+    		_min = min(sim_dist_vec + diff_dist_vec)
+    		_nbins = 50
+    		bins = np.linspace(_min, _max, _nbins)
+
+    		pyplot.hist(sim_dist_vec, bins, alpha=0.5, label='friends')
+    		pyplot.hist(diff_dist_vec, bins, alpha=0.5, label='non-friends')
+    		pyplot.legend(loc='upper right')
+    		pyplot.title( "distance distrance of user (id: %d, taste: %d)" % (the_user_id, the_user_taste) )
+
+     		## step06
+    		## processing dist data
+    		## exclude extreme small value
+    		sim_dist_vec = [i for i in sim_dist_vec if i > 0.0001]
+    		diff_dist_vec = [i for i in diff_dist_vec if i > 0.0001]
+
+    		friend_ray_param = rayleigh.fit(sim_dist_vec)
+    		nonfriend_ray_param = rayleigh.fit(diff_dist_vec)
+
+    		x = linspace(_min, _max, 100)
+    		# fitted distribution
+    		f_rayleigh_pdf = rayleigh.pdf(x, loc=friend_ray_param[0],scale=friend_ray_param[1])
+    		# original distribution
+    		nf_rayleigh_pdf = rayleigh.pdf(x, loc=nonfriend_ray_param[0], scale=nonfriend_ray_param[1])
+    		pyplot.plot(x, f_rayleigh_pdf ,'b-', x, nf_rayleigh_pdf ,'g-')
+
+    		#pyplot.show()
+    		file_name = image_name_prefix + "%d.png" % the_user_id
+    		pyplot.savefig(out_image_dir + file_name, format='png')
+    		pyplot.clf()
+
+    	## step07
+    	## ks-test
+    	res_ks_test = ks_2samp(sim_dist_vec, diff_dist_vec)
+    	ks_test_df.loc[counter] = [ the_user_id, the_user_taste, res_ks_test[1] ]
 
 
 ## ################################### ##
