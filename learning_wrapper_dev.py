@@ -147,7 +147,7 @@ def user_grouped_dist(user_id, weights, profile_df, friends_df):
             is extracted by LDM().fit(x, y).get_transform_matrix()
         * profile_df: {matrix-like, pandas.DataFrame}, user profile dataframe
             with columns: ["ID", "x0" - "xn"]
-        * friend_list: {matrix-like, pandas.DataFrame}, pandas.DataFrame store
+        * friends_df: {matrix-like, pandas.DataFrame}, pandas.DataFrame store
             pair of user ID(s) to represent connections with columns:
             ["uid_a", "uid_b"]
 
@@ -159,9 +159,9 @@ def user_grouped_dist(user_id, weights, profile_df, friends_df):
         Examples:
         ---------
         weights = ldm().fit(df, friends_list).get_transform_matrix()
-        profile_df = users_df[["ID", cols]]
+        profile_df = users_df[ ["ID"] + cols ]
         user_dist = user_grouped_dist(user_id = 0, weights = weights
-            , profile_df, friends_list)
+            , profile_df, friends_df)
         print user_dist["friends"]
         print user_dist["nonfriends"]
     """
@@ -188,6 +188,7 @@ def user_grouped_dist(user_id, weights, profile_df, friends_df):
 
     res = [sim_dist_vec, diff_dist_vec]
     return res
+
 
 def user_dist_kstest(sim_dist_vec, diff_dist_vec):
     """ Test the goodness of a given weights to defferentiate friend distance
@@ -221,96 +222,137 @@ def user_dist_kstest(sim_dist_vec, diff_dist_vec):
     res = ks_2samp(samp_friend, samp_nonfriend)[1]
     return res
 
-def users_filter_by_weights():
-    """ Split a list of users into two groups, "valid group" and "invalid group",
-        with respect to the ks-test on the null hypothesis that friends'
-        weighted distance is significantly different from the couterpart of
-        non-friends. Assume the weighted distances of each group follow Rayleigh
-        distribution.
+
+def users_filter_by_weights(weights, profile_df, friends_df,
+                            pval_threshold = 0.20,
+                            min_friend_cnt = 10):
+    """ Split a list of users into two groups, "good fit group"(reject) and
+        "invalid group", with respect to the ks-test on the null hypothesis that
+        friends' weighted distance is not significantly different from the
+        couterpart of non-friends. Assume the weighted distances of each group
+        follow Rayleigh distribution.
 
         Parameters:
         ----------
-        weights: {}
+        * weights: {vector-like, float}, the vector of feature weights which
+            is extracted by LDM().fit(x, y).get_transform_matrix()
+        * profile_df: {matrix-like, pandas.DataFrame}, user profile dataframe
+            with columns: ["ID", "x0" - "xn"]
+        * friends_df: {matrix-like, pandas.DataFrame}, pandas.DataFrame store
+            pair of user ID(s) to represent connections with columns:
+            ["uid_a", "uid_b"]
+        * pval_threshold: {float}, the threshold for p-value to reject hypothesis
+        * min_friend_cnt: {integer}, drop users whose total of friends is less
+            than this minimum count
 
         Returns:
         -------
+        res: {list} grouped list of user ids
+           res[0] stores all users whose null hypothesis does not holds
+           res[1] stores all users whose null hypothesis hold
+           null hypothesis, given weights, distance distribution of all friends
+           is significantly different from distance distribution of all non-fri
+           -ends
 
         Examples:
         --------
+        weights = ldm().fit(df, friends_list).get_transform_matrix()
+        profile_df = users_df[["ID", cols]]
+        grouped_users = users_filter_by_weights(weights,
+                            profile_df, friends_df,
+                            pval_threshold = 0.10, min_friend_cnt = 10)
 
+        Notes:
+        -----
+        min_friend_cnt is not implemented
     """
 
+    all_users_ids = list(set(profile_df.ID))
+    ## container for users meeting different critiria
+    good_fits = []
+    bad_fits = []
+    for uid in all_users_ids:
+        res_dists = user_grouped_dist(uid, weights, profile_df, friends_df)
+        pval = user_dist_kstest(res_dists[0], res_dists[1])
+        if pval <= pval_threshold:
+            good_fits.append(uid)
+        else:
+            bad_fits.append(uid)
+
+    res = [good_fits, bad_fits]
+    return res
+
+def ldm_train_with_list(ldm, )
 
 
-    ## infunction variable
-    ks_test_df = pd.DataFrame(columns = ["ID", "taste", "ks_pvalue"])
-
-    for counter, the_user_id in enumerate(all_user_ids):
-    	the_user_profile = users_df.ix[users_df.ID == the_user_id, cols].as_matrix()
-    	the_user_taste   = users_df.ix[users_df.ID == the_user_id, "decision_style"].as_matrix()[0]
-
-    	## step01
-    	## handle user_id present in both columns (uid_a, uid_b)
-    	friends_id_ls = friends_df[friends_df.uid_a == the_user_id].uid_b.as_matrix()
-    	friends_id_ls = list(set(friends_id_ls))
-    	## step02
-    	## calculate the distance with friend-user
-    	sim_dist_vec = []
-    	for f_id in friends_id_ls:
-    	    friend_profile = users_df.ix[users_df.ID == f_id, cols].as_matrix()
-    	    the_dist = weighted_euclidean(the_user_profile, friend_profile, the_weights)
-    	    sim_dist_vec.append(the_dist)
-
-    	## step03
-    	##
-    	non_friends_id_ls = [u for u in users_df.ID if u not in friends_id_ls + the_user_id]
-    	#non_friends_id_ls = choice()
-
-    	## step04
-    	diff_dist_vec = []
-    	for f_id in non_friends_id_ls:
-    	    friend_profile = users_df.ix[users_df.ID == f_id, cols].as_matrix()
-    	    the_dist = weighted_euclidean(the_user_profile, friend_profile, the_weights)
-    	    diff_dist_vec.append(the_dist)
-
-    	## step05
-    	##
-    	if isPlot:
-    		_max = max(sim_dist_vec + diff_dist_vec)
-    		_min = min(sim_dist_vec + diff_dist_vec)
-    		_nbins = 50
-    		bins = np.linspace(_min, _max, _nbins)
-
-    		pyplot.hist(sim_dist_vec, bins, alpha=0.5, label='friends')
-    		pyplot.hist(diff_dist_vec, bins, alpha=0.5, label='non-friends')
-    		pyplot.legend(loc='upper right')
-    		pyplot.title( "distance distrance of user (id: %d, taste: %d)" % (the_user_id, the_user_taste) )
-
-     		## step06
-    		## processing dist data
-    		## exclude extreme small value
-    		sim_dist_vec = [i for i in sim_dist_vec if i > 0.0001]
-    		diff_dist_vec = [i for i in diff_dist_vec if i > 0.0001]
-
-    		friend_ray_param = rayleigh.fit(sim_dist_vec)
-    		nonfriend_ray_param = rayleigh.fit(diff_dist_vec)
-
-    		x = linspace(_min, _max, 100)
-    		# fitted distribution
-    		f_rayleigh_pdf = rayleigh.pdf(x, loc=friend_ray_param[0],scale=friend_ray_param[1])
-    		# original distribution
-    		nf_rayleigh_pdf = rayleigh.pdf(x, loc=nonfriend_ray_param[0], scale=nonfriend_ray_param[1])
-    		pyplot.plot(x, f_rayleigh_pdf ,'b-', x, nf_rayleigh_pdf ,'g-')
-
-    		#pyplot.show()
-    		file_name = image_name_prefix + "%d.png" % the_user_id
-    		pyplot.savefig(out_image_dir + file_name, format='png')
-    		pyplot.clf()
-
-    	## step07
-    	## ks-test
-    	res_ks_test = ks_2samp(sim_dist_vec, diff_dist_vec)
-    	ks_test_df.loc[counter] = [ the_user_id, the_user_taste, res_ks_test[1] ]
+#    ks_test_df = pd.DataFrame(columns = ["ID", "taste", "ks_pvalue"])
+#
+#    for counter, the_user_id in enumerate(all_user_ids):
+#    	the_user_profile = users_df.ix[users_df.ID == the_user_id, cols].as_matrix()
+#    	the_user_taste   = users_df.ix[users_df.ID == the_user_id, "decision_style"].as_matrix()[0]
+#
+#    	## step01
+#    	## handle user_id present in both columns (uid_a, uid_b)
+#    	friends_id_ls = friends_df[friends_df.uid_a == the_user_id].uid_b.as_matrix()
+#    	friends_id_ls = list(set(friends_id_ls))
+#    	## step02
+#    	## calculate the distance with friend-user
+#    	sim_dist_vec = []
+#    	for f_id in friends_id_ls:
+#    	    friend_profile = users_df.ix[users_df.ID == f_id, cols].as_matrix()
+#    	    the_dist = weighted_euclidean(the_user_profile, friend_profile, the_weights)
+#    	    sim_dist_vec.append(the_dist)
+#
+#    	## step03
+#    	##
+#    	non_friends_id_ls = [u for u in users_df.ID if u not in friends_id_ls + the_user_id]
+#    	#non_friends_id_ls = choice()
+#
+#    	## step04
+#    	diff_dist_vec = []
+#    	for f_id in non_friends_id_ls:
+#    	    friend_profile = users_df.ix[users_df.ID == f_id, cols].as_matrix()
+#    	    the_dist = weighted_euclidean(the_user_profile, friend_profile, the_weights)
+#    	    diff_dist_vec.append(the_dist)
+#
+#    	## step05
+#    	##
+#    	if isPlot:
+#    		_max = max(sim_dist_vec + diff_dist_vec)
+#    		_min = min(sim_dist_vec + diff_dist_vec)
+#    		_nbins = 50
+#    		bins = np.linspace(_min, _max, _nbins)
+#
+#    		pyplot.hist(sim_dist_vec, bins, alpha=0.5, label='friends')
+#    		pyplot.hist(diff_dist_vec, bins, alpha=0.5, label='non-friends')
+#    		pyplot.legend(loc='upper right')
+#    		pyplot.title( "distance distrance of user (id: %d, taste: %d)" % (the_user_id, the_user_taste) )
+#
+#     		## step06
+#    		## processing dist data
+#    		## exclude extreme small value
+#    		sim_dist_vec = [i for i in sim_dist_vec if i > 0.0001]
+#    		diff_dist_vec = [i for i in diff_dist_vec if i > 0.0001]
+#
+#    		friend_ray_param = rayleigh.fit(sim_dist_vec)
+#    		nonfriend_ray_param = rayleigh.fit(diff_dist_vec)
+#
+#    		x = linspace(_min, _max, 100)
+#    		# fitted distribution
+#    		f_rayleigh_pdf = rayleigh.pdf(x, loc=friend_ray_param[0],scale=friend_ray_param[1])
+#    		# original distribution
+#    		nf_rayleigh_pdf = rayleigh.pdf(x, loc=nonfriend_ray_param[0], scale=nonfriend_ray_param[1])
+#    		pyplot.plot(x, f_rayleigh_pdf ,'b-', x, nf_rayleigh_pdf ,'g-')
+#
+#    		#pyplot.show()
+#    		file_name = image_name_prefix + "%d.png" % the_user_id
+#    		pyplot.savefig(out_image_dir + file_name, format='png')
+#    		pyplot.clf()
+#
+#    	## step07
+#    	## ks-test
+#    	res_ks_test = ks_2samp(sim_dist_vec, diff_dist_vec)
+#    	ks_test_df.loc[counter] = [ the_user_id, the_user_taste, res_ks_test[1] ]
 
 
 ## ################################### ##
