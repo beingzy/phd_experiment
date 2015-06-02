@@ -187,17 +187,19 @@ def user_grouped_dist(user_id, weights, profile_df, friends_df):
     return res
 
 
-def user_dist_kstest(sim_dist_vec, diff_dist_vec):
+def user_dist_kstest(sim_dist_vec, diff_dist_vec, fit_rayleigh=False):
     """ Test the goodness of a given weights to defferentiate friend distance
         distributions and non-friend distance distributions of a given user.
         The distance distribution is considered to follow Rayleigh distribution.
 
         Parameters:
         ----------
-        * sim_dist_vec: {vector-like (list), float}: distances between friends
+        * sim_dist_vec: {vector-like (list), float}, distances between friends
             and the user
-        * diff_dist_vec: {vector-like (list), float}: distances between non-friends
-            and the user
+        * diff_dist_vec: {vector-like (list), float}, distances between non-fri
+            -ends and the user
+        * fit_rayleigh: {boolean}, determine if fit data into Rayleigth distri
+            -bution
 
         Returns:
         -------
@@ -208,15 +210,18 @@ def user_dist_kstest(sim_dist_vec, diff_dist_vec):
         ---------
         pval = user_dist_kstest(sim_dist_vec, diff_dist_vec)
     """
-    _n = 100
-    friend_param = rayleigh.fit(sim_dist_vec)
-    nonfriend_param = rayleigh.fit(diff_dist_vec)
+    if fit_rayleigh:
+        _n = 100
+        friend_param = rayleigh.fit(sim_dist_vec)
+        nonfriend_param = rayleigh.fit(diff_dist_vec)
 
-    samp_friend = rayleigh.rvs(friend_param[0], friend_param[1], _n)
-    samp_nonfriend = rayleigh.rvs(nonfriend_param[0], nonfriend_param[1], _n)
+        samp_friend = rayleigh.rvs(friend_param[0], friend_param[1], _n)
+        samp_nonfriend = rayleigh.rvs(nonfriend_param[0], nonfriend_param[1], _n)
 
-    ## ouput p-value of ks-test
-    res = ks_2samp(samp_friend, samp_nonfriend)[1]
+        ## ouput p-value of ks-test
+        res = ks_2samp(samp_friend, samp_nonfriend)[1]
+    else:
+        res = ks_2samp(sim_dist_vec, diff_dist_vec)[1]
     return res
 
 
@@ -224,10 +229,10 @@ def users_filter_by_weights(weights, users_list,
                             profile_df, friends_df,
                             pval_threshold=0.20, min_friend_cnt=10):
     """ Split a list of users into two groups, "good fit group"(reject) and
-        "invalid group", with respect to the ks-test on the null hypothesis
-        that friends' weighted distance is not significantly different from the
-        couterpart of non-friends. Assume the weighted distances of each group
-        follow Rayleigh distribution.
+        "bad fit group", with respect to the ks-test on the null hypothesis
+        that the distribution of friends' weighted distance is not significant
+        -ly different from the couterpart for non-friends. Assume the weighted
+        distances of each group follow Rayleigh distribution.
 
         Parameters:
         ----------
@@ -239,7 +244,8 @@ def users_filter_by_weights(weights, users_list,
         * friends_df: {matrix-like, pandas.DataFrame}, pandas.DataFrame store
             pair of user ID(s) to represent connections with columns:
             ["uid_a", "uid_b"]
-        * pval_threshold: {float}, the threshold for p-value to reject hypothesis
+        * pval_threshold: {float}, the threshold for p-value to reject hypothes
+            -is
         * min_friend_cnt: {integer}, drop users whose total of friends is less
             than this minimum count
 
@@ -255,7 +261,7 @@ def users_filter_by_weights(weights, users_list,
         Examples:
         --------
         weights = ldm().fit(df, friends_list).get_transform_matrix()
-        profile_df = users_df[["ID", cols]]
+        profile_df = users_df[["ID"] + cols]
         grouped_users = users_filter_by_weights(weights,
                             profile_df, friends_df,
                             pval_threshold = 0.10, min_friend_cnt = 10)
