@@ -29,22 +29,17 @@ c. repeat the process until the a criteria had been met
 import os
 import sys
 import glob
-
 import numpy as np
 import scipy as sp
 import pandas as pd
-
-from learning_dist_metrics.ldm import LDM
-from learning_dist_metrics.dist_metrics import weighted_euclidean
-from learning_dist_metrics.datasets import load_data
-from UserBatch import SimScore, WeightedEuclidean, UserBatch
-
 from matplotlib import pyplot
-
 from scipy.stats import rayleigh
 from scipy.stats import ks_2samp
 from numpy import linspace
 from numpy.random import choice
+
+from learning_dist_metrics.ldm import LDM
+from learning_dist_metrics.dist_metrics import weighted_euclidean
 
 ## ################## ##
 ## Setup envinronment ##
@@ -80,7 +75,6 @@ friends_df = friends_df[friends_df.isFriend == 1]
 friends_df["pair"] = friends_df[["uid_a", "uid_b"]].apply(lambda x: (int(x[0]), int(x[1])), axis=1)
 friends_df.drop("isFriend", axis=1, inplace=True)
 friends_df = friends_df[["pair", "uid_a", "uid_b"]]
-friends_df.head(3)
 
 ## ######################### ##
 ## Create Learning Container ##
@@ -90,6 +84,9 @@ friends_df.head(3)
 ##user_nx.load_friends(friends_df)
 ## Feed data into the Learning Distance Matrix Algorithm (LDM)
 cols = ["x0", "x1", "x2", "x3", "x4", "x5"]
+
+## subset users data to retain profile only
+profile_df = users_df[["ID"] + cols]
 
 ldm = LDM()
 ldm.fit(users_df[cols], friends_df.pair.as_matrix())
@@ -224,11 +221,10 @@ def user_dist_kstest(sim_dist_vec, diff_dist_vec):
 
 
 def users_filter_by_weights(weights, profile_df, friends_df,
-                            pval_threshold = 0.20,
-                            min_friend_cnt = 10):
+                            pval_threshold=0.20, min_friend_cnt=10):
     """ Split a list of users into two groups, "good fit group"(reject) and
-        "invalid group", with respect to the ks-test on the null hypothesis that
-        friends' weighted distance is not significantly different from the
+        "invalid group", with respect to the ks-test on the null hypothesis
+        that friends' weighted distance is not significantly different from the
         couterpart of non-friends. Assume the weighted distances of each group
         follow Rayleigh distribution.
 
@@ -268,7 +264,7 @@ def users_filter_by_weights(weights, profile_df, friends_df,
     """
 
     all_users_ids = list(set(profile_df.ID))
-    ## container for users meeting different critiria
+    # container for users meeting different critiria
     good_fits = []
     bad_fits = []
     for uid in all_users_ids:
@@ -282,7 +278,47 @@ def users_filter_by_weights(weights, profile_df, friends_df,
     res = [good_fits, bad_fits]
     return res
 
-def ldm_train_with_list(ldm, )
+def ldm_train_with_list(users_list, ldm,
+                        profile_df, friends_df,
+                        retain_type=0):
+    """ learning distance matrics with ldm() instance, provided
+        with selected list of users.
+
+        Parameters:
+        -----------
+        * users_list: {vector-like, integer}, the list of user id
+        * ldm: {object}, LMD() object
+        * profile_df: {matrix-like, pandas.DataFrame}, user profile dataframe
+            with columns: ["ID", "x0" - "xn"]
+        * friends_df: {matrix-like, pandas.DataFrame}, pandas.DataFrame store
+            pair of user ID(s) to represent connections with columns:
+            ["uid_a", "uid_b"]
+        * retain_type: {integer}, 0, adopting 'or' logic by keeping relation
+            -ship in friends_df if either of entities is in user_list
+            1, adopting 'and' logic
+
+        Returns:
+        -------
+        res: {vector-like, float}, output of ldm.get_transform_matrix()
+
+        Examples:
+        ---------
+        new_ldm = LDM()
+        new_dist_metrics = ldm_train_with_list(user_list, new_ldm,
+                                               profile_df,
+                                               friends_df)
+    """
+
+    if retain_type == 0:
+        friends_df = friends_df.ix[friends_df.uid_a.isin(users_list) |
+                                   friends_df.uid_b.isin(users_list)]
+    else:
+        friends_df = friends_df.ix[friends_df.uid_a.isin(users_list) &
+                                   friends_df.uid_b.isin(users_list)]
+
+    cols = profile_df.columns.drop("ID")
+    ldm.fit(profile_df[cols], friends_df.pair.as_matrix())
+    return ldm.get_transform_matrix()
 
 
 #    ks_test_df = pd.DataFrame(columns = ["ID", "taste", "ks_pvalue"])
