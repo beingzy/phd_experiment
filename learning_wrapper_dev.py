@@ -278,7 +278,7 @@ def users_filter_by_weights(weights, profile_df, friends_df,
     res = [good_fits, bad_fits]
     return res
 
-def ldm_train_with_list(users_list, ldm,
+def ldm_train_with_list(users_list,
                         profile_df, friends_df,
                         retain_type=0):
     """ learning distance matrics with ldm() instance, provided
@@ -287,7 +287,6 @@ def ldm_train_with_list(users_list, ldm,
         Parameters:
         -----------
         * users_list: {vector-like, integer}, the list of user id
-        * ldm: {object}, LMD() object
         * profile_df: {matrix-like, pandas.DataFrame}, user profile dataframe
             with columns: ["ID", "x0" - "xn"]
         * friends_df: {matrix-like, pandas.DataFrame}, pandas.DataFrame store
@@ -303,12 +302,11 @@ def ldm_train_with_list(users_list, ldm,
 
         Examples:
         ---------
-        new_ldm = LDM()
-        new_dist_metrics = ldm_train_with_list(user_list, new_ldm,
+        new_dist_metrics = ldm_train_with_list(user_list,
                                                profile_df,
                                                friends_df)
     """
-
+    ldm = LDM()
     if retain_type == 0:
         friends_df = friends_df.ix[friends_df.uid_a.isin(users_list) |
                                    friends_df.uid_b.isin(users_list)]
