@@ -220,7 +220,8 @@ def user_dist_kstest(sim_dist_vec, diff_dist_vec):
     return res
 
 
-def users_filter_by_weights(weights, profile_df, friends_df,
+def users_filter_by_weights(weights, users_list,
+                            profile_df, friends_df,
                             pval_threshold=0.20, min_friend_cnt=10):
     """ Split a list of users into two groups, "good fit group"(reject) and
         "invalid group", with respect to the ks-test on the null hypothesis
@@ -232,6 +233,7 @@ def users_filter_by_weights(weights, profile_df, friends_df,
         ----------
         * weights: {vector-like, float}, the vector of feature weights which
             is extracted by LDM().fit(x, y).get_transform_matrix()
+        * users_list: {vector-like, integer}, the list of user id
         * profile_df: {matrix-like, pandas.DataFrame}, user profile dataframe
             with columns: ["ID", "x0" - "xn"]
         * friends_df: {matrix-like, pandas.DataFrame}, pandas.DataFrame store
@@ -262,12 +264,12 @@ def users_filter_by_weights(weights, profile_df, friends_df,
         -----
         min_friend_cnt is not implemented
     """
-
-    all_users_ids = list(set(profile_df.ID))
+    #all_users_ids = list(set(profile_df.ID))
+    users_list
     # container for users meeting different critiria
     good_fits = []
     bad_fits = []
-    for uid in all_users_ids:
+    for uid in users_list:
         res_dists = user_grouped_dist(uid, weights, profile_df, friends_df)
         pval = user_dist_kstest(res_dists[0], res_dists[1])
         if pval <= pval_threshold:
