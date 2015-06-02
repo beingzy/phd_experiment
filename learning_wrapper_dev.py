@@ -187,7 +187,8 @@ def user_grouped_dist(user_id, weights, profile_df, friends_df):
     return res
 
 
-def user_dist_kstest(sim_dist_vec, diff_dist_vec, fit_rayleigh=False):
+def user_dist_kstest(sim_dist_vec, diff_dist_vec,
+                     fit_rayleigh=True, min_nobs=10):
     """ Test the goodness of a given weights to defferentiate friend distance
         distributions and non-friend distance distributions of a given user.
         The distance distribution is considered to follow Rayleigh distribution.
@@ -200,7 +201,8 @@ def user_dist_kstest(sim_dist_vec, diff_dist_vec, fit_rayleigh=False):
             -ends and the user
         * fit_rayleigh: {boolean}, determine if fit data into Rayleigth distri
             -bution
-
+        * min_nobs: {integer}, minmum number of observations required for compar
+            -ing
         Returns:
         -------
         * res: {float}: p-value of ks-test with assumption that distances follow
@@ -210,6 +212,8 @@ def user_dist_kstest(sim_dist_vec, diff_dist_vec, fit_rayleigh=False):
         ---------
         pval = user_dist_kstest(sim_dist_vec, diff_dist_vec)
     """
+    is_valid = ( len(sim_dist_vec)  >= min_nobs ) & \
+               ( len(diff_dist_vec) >= min_nobs ) # not used yet
     if fit_rayleigh:
         _n = 100
         friend_param = rayleigh.fit(sim_dist_vec)
