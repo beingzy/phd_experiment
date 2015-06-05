@@ -44,7 +44,7 @@ from learning_dist_metrics.dist_metrics import weighted_euclidean
 ## ################## ##
 ## Setup envinronment ##
 ## ################## ##
-#ROOT_PATH = "/Users/beingzy/Documents/Projects/phd_experiment/"
+# ROOT_PATH = "/Users/beingzy/Documents/Projects/phd_experiment/"
 ROOT_PATH = "/home/beingzy/Documents/projects/phd_experiment/"
 DATA_PATH = ROOT_PATH + "data/sim_data_yi/"
 IMG_PATH  = ROOT_PATH + "images/"
@@ -55,22 +55,22 @@ if os.getcwd() != ROOT_PATH:
 ## ################## ##
 ## Load data          ##
 ## ################## ##
-##  simulate dataset with column names at 1st row
-##  * user_profile.csv with x1 - x6, 6 variables, represent 2 group of users
-##  * frienships.csv with isFriend, binary variable to indicate 1 for friends or 0 for
-##    non-friends
-##  * dist_mat.csv pre-calcualted pair-wise distance
-users_df   = pd.read_csv(DATA_PATH + "users_profile.csv", header = 0, sep = ",")
-friends_df = pd.read_csv(DATA_PATH + "friendships.csv", header = 0, sep = ",")
-dist_df    = pd.read_csv(DATA_PATH + "dist_mat.csv", header = 0, sep = ",")
+# simulate dataset with column names at 1st row
+# * user_profile.csv with x1 - x6, 6 variables, represent 2 group of users
+# * frienships.csv with isFriend, binary variable to indicate 1 for friends or
+#   0 for non-friends
+# * dist_mat.csv pre-calcualted pair-wise distance
+users_df = pd.read_csv(DATA_PATH + "users_profile.csv", header=0, sep=",")
+friends_df = pd.read_csv(DATA_PATH + "friendships.csv", header=0, sep=",")
+dist_df = pd.read_csv(DATA_PATH + "dist_mat.csv", header=0, sep=",")
 
 ## ################### ##
 ## Data Processing     ##
 ## ################### ##
-## friends_df is processed
-## a. create a new column to denote the user pair
-## b. exclude user-pair of non-friends
-## c. drop the 'isFriend' columns
+# friends_df is processed
+# a. create a new column to denote the user pair
+# b. exclude user-pair of non-friends
+# c. drop the 'isFriend' columns
 friends_df = friends_df[friends_df.isFriend == 1]
 friends_df["pair"] = friends_df[["uid_a", "uid_b"]].apply(lambda x: (int(x[0]), int(x[1])), axis=1)
 friends_df.drop("isFriend", axis=1, inplace=True)
@@ -193,34 +193,36 @@ def user_dist_kstest(sim_dist_vec, diff_dist_vec,
         distributions and non-friend distance distributions of a given user.
         The distance distribution is considered to follow Rayleigh distribution.
 
-        Parameters:
-        ----------
-        * sim_dist_vec: {vector-like (list), float}, distances between friends
-            and the user
-        * diff_dist_vec: {vector-like (list), float}, distances between non-fri
-            -ends and the user
-        * fit_rayleigh: {boolean}, determine if fit data into Rayleigth distri
-            -bution
-        * min_nobs: {integer}, minmum number of observations required for compar
-            -ing
-        Returns:
-        -------
-        * res: {float}: p-value of ks-test with assumption that distances follow
+    Parameters:
+    ----------
+    sim_dist_vec: {vector-like (list), float}, distances between friends
+                  and the user
+    diff_dist_vec: {vector-like (list), float}, distances between non-fri
+                   -ends and the user
+    fit_rayleigh: {boolean}, determine if fit data into Rayleigth distri
+                  -bution
+    min_nobs: {integer}, minmum number of observations required for compar
+              -ing
+
+    Returns:
+    -------
+    * res: {float}: p-value of ks-test with assumption that distances follow
             Rayleigh distribution.
 
-        Examples:
-        ---------
-        pval = user_dist_kstest(sim_dist_vec, diff_dist_vec)
+    Examples:
+    ---------
+    pval = user_dist_kstest(sim_dist_vec, diff_dist_vec)
     """
-    is_valid = ( len(sim_dist_vec)  >= min_nobs ) & \
-               ( len(diff_dist_vec) >= min_nobs ) # not used yet
+    is_valid =  (len(sim_dist_vec) >= min_nobs) & \
+                (len(diff_dist_vec) >= min_nobs) # not used yet
     if fit_rayleigh:
         _n = 100
         friend_param = rayleigh.fit(sim_dist_vec)
         nonfriend_param = rayleigh.fit(diff_dist_vec)
 
         samp_friend = rayleigh.rvs(friend_param[0], friend_param[1], _n)
-        samp_nonfriend = rayleigh.rvs(nonfriend_param[0], nonfriend_param[1], _n)
+        samp_nonfriend = rayleigh.rvs(nonfriend_param[0], nonfriend_param[1],
+                                      _n)
 
         ## ouput p-value of ks-test
         res = ks_2samp(samp_friend, samp_nonfriend)[1]
@@ -229,14 +231,15 @@ def user_dist_kstest(sim_dist_vec, diff_dist_vec,
     return res
 
 
-def users_filter_by_weights(weights, users_list,
-                            profile_df, friends_df,
-                            pval_threshold=0.20, min_friend_cnt=10):
-    """ Split a list of users into two groups, "good fit group"(reject) and
-        "bad fit group", with respect to the ks-test on the null hypothesis
-        that the distribution of friends' weighted distance is not significant
-        -ly different from the couterpart for non-friends. Assume the weighted
-        distances of each group follow Rayleigh distribution.
+def users_filter_by_weights(weights, users_list, profile_df, friends_df,
+                            pval_threshold=0.20,
+                            mutate_rate=0.4,
+                            min_friend_cnt=10):
+    """ Split users into two groups, "keep" and "mutate", with respect to
+        p-value of the ks-test on the null hypothesis that the distribution of
+        friends' weighted distance is not significantly different from the
+        couterpart for non-friends. Assume the weighted distances of each group
+        follow Rayleigh distribution.
 
         Parameters:
         ----------
@@ -252,6 +255,8 @@ def users_filter_by_weights(weights, users_list,
             -is
         * min_friend_cnt: {integer}, drop users whose total of friends is less
             than this minimum count
+        * mutate_rate: {float}, a float value [0 - 1] determine the percentage
+            of bad_fits member sent to mutation
 
         Returns:
         -------
@@ -274,20 +279,26 @@ def users_filter_by_weights(weights, users_list,
         -----
         min_friend_cnt is not implemented
     """
-    #all_users_ids = list(set(profile_df.ID))
-    users_list
+    # all_users_ids = list(set(profile_df.ID))
+    # users_list
     # container for users meeting different critiria
-    good_fits = []
-    bad_fits = []
+    pvals = []
     for uid in users_list:
         res_dists = user_grouped_dist(uid, weights, profile_df, friends_df)
-        pval = user_dist_kstest(res_dists[0], res_dists[1])
-        if pval <= pval_threshold:
-            good_fits.append(uid)
-        else:
-            bad_fits.append(uid)
+        pvals.append(user_dist_kstest(res_dists[0], res_dists[1]))
+    #    if pval <= pval_threshold:
+    #        good_fits.append(uid)
+    #    else:
+    #        bad_fits.append(uid)
+    sorted_id_pval = sorted(zip(users_list, pvals), key=lambda x: x[1])
+    good_fits = [i for i, p in sorted_id_pval if p <= pval_threshold]
+    bad_fits = [i for i, p in sorted_id_pval if p > pval_threshold]
 
-    res = [good_fits, bad_fits]
+    if len(bad_fits) > 0:
+        mutate_size = max(len(bad_fits) * mutate_rate, 1)
+    id_mutate = bad_fits[:mutate_size]
+    id_retain = good_fits + bad_fits[mutate_size:]
+    res = [id_retain, id_mutate]
     return res
 
 def ldm_train_with_list(users_list,
