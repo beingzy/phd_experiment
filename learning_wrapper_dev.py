@@ -132,7 +132,7 @@ is_plot = False
 image_name_prefix = "hist_id_"
 out_image_dir = IMG_PATH
 
-def user_grouped_dist(user_id, weights, profile_df, friends_df):
+def user_grouped_dist(user_id, weights, profile_df, friends_networkx):
     """ Calculate distances between a user and whose friends
         and distance between a user and whose non-friends.
         The groupped distance vector will be output.
@@ -144,9 +144,8 @@ def user_grouped_dist(user_id, weights, profile_df, friends_df):
             is extracted by LDM().fit(x, y).get_transform_matrix()
         * profile_df: {matrix-like, pandas.DataFrame}, user profile dataframe
             with columns: ["ID", "x0" - "xn"]
-        * friends_df: {matrix-like, pandas.DataFrame}, pandas.DataFrame store
-            pair of user ID(s) to represent connections with columns:
-            ["uid_a", "uid_b"]
+        * friends_networkx: {networkx.Graph()}, Graph() object from Networkx
+            to store the relationships information
 
         Returns:
         -------
@@ -166,17 +165,15 @@ def user_grouped_dist(user_id, weights, profile_df, friends_df):
     # get the user profile information of the target users
     user_profile = profile_df.ix[profile_df.ID == user_id, cols].as_matrix()
     # get the user_id of friends of the target user
-    friends_ls_a = friends_df[friends_df.uid_a == user_id].uid_b.as_matrix()
-    friends_ls_b = friends_df[friends_df.uid_b == user_id].uid_a.as_matrix()
-    friends_ls = list(set(friends_ls_a)) + list(set(friends_ls_b))
-    # calculate the weighted distance of friends
+    friends_ls = friends_networkx.neighbors(user_id)
+    non_friends_ls = [u for u in profile_df.ID if u not in friends_ls + [user_id]]
+
     sim_dist_vec = []
     for f_id in friends_ls:
         friend_profile = profile_df.ix[profile_df.ID == f_id, cols].as_matrix()
         the_dist = weighted_euclidean(user_profile, friend_profile, weights)
         sim_dist_vec.append(the_dist)
-    # calculate the weighted distances of non-friends
-    non_friends_ls = [u for u in profile_df.ID if u not in friends_ls + [user_id]]
+
     diff_dist_vec = []
     for nf_id in non_friends_ls:
         nonfriend_profile = profile_df.ix[profile_df.ID == nf_id, cols].as_matrix()
@@ -188,7 +185,7 @@ def user_grouped_dist(user_id, weights, profile_df, friends_df):
 
 
 def user_dist_kstest(sim_dist_vec, diff_dist_vec,
-                     fit_rayleigh=True, min_nobs=10, _n=100):
+                     fit_rayleigh=False, min_nobs=10, _n=100):
     """ Test the goodness of a given weights to defferentiate friend distance
         distributions and non-friend distance distributions of a given user.
         The distance distribution is considered to follow Rayleigh distribution.
@@ -287,10 +284,7 @@ def users_filter_by_weights(weights, users_list, profile_df, friends_df,
     for uid in users_list:
         res_dists = user_grouped_dist(uid, weights, profile_df, friends_df)
         pvals.append(user_dist_kstest(res_dists[0], res_dists[1]))
-    #    if pval <= pval_threshold:
-    #        good_fits.append(uid)
-    #    else:
-    #        bad_fits.append(uid)
+
     sorted_id_pval = sorted(zip(users_list, pvals), key=lambda x: x[1])
     good_fits = [i for i, p in sorted_id_pval if p <= pval_threshold]
     bad_fits = [i for i, p in sorted_id_pval if p > pval_threshold]
