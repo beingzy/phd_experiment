@@ -104,31 +104,31 @@ ldm.fit(users_df[cols], friends_df.pair.as_matrix())
 ## step06: fit with Rayleigh Distribution,
 ## step07: ks-test Rayleigh(friends) vs. Rayleigh(non-friends)
 ##
-## data description:
-## ----------------
-## taste group 0 (%): ~ 70% (important features: x0 - x2)
-## taste group 1 (%): ~ 30% (important features: x3 - x5)
-##
-## parameters:
-## -----------
-## a. threshold for significance
-## b. minimum number of friends, if user having #friends LT min., is considered as majority
-##
-## issues:
-## ------
-## no implemented mechanism to handle users having too few friends
-## solution:
-## a. hold them off from learning
-## b. consider them from the majority
+# data description:
+# ----------------
+# taste group 0 (%): ~ 70% (important features: x0 - x2)
+# taste group 1 (%): ~ 30% (important features: x3 - x5)
+#
+# parameters:
+# -----------
+# a. threshold for significance
+# b. minimum number of friends, if user having #friends LT min., is considered as majority
+#
+# issues:
+# ------
+# no implemented mechanism to handle users having too few friends
+# solution:
+# a. hold them off from learning
+#  b. consider them from the majority
 
-## date: 05/23/2015
-## task: wrap the logics into a function
+# date: 05/23/2015
+# task: wrap the logics into a function
 
-## primary parameters:
+# primary parameters:
 all_user_ids = list(set(users_df.ID))
 the_weights = ldm.get_transform_matrix()
 
-## secondary parameters:
+# secondary parameters:
 is_plot = False
 image_name_prefix = "hist_id_"
 out_image_dir = IMG_PATH
@@ -150,8 +150,8 @@ def user_grouped_dist(user_id, weights, profile_df, friends_networkx):
 
         Returns:
         -------
-        res: {list, list of integers}, a list of two lists, which store the distances
-            of either friends and non-friends separately.
+        res: {list, list of integers}, a list of two lists, which store the dis
+             -tances of either friends and non-friends separately.
 
         Examples:
         ---------
