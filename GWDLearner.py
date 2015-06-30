@@ -217,17 +217,17 @@ def ldm_train_with_list(users_list, profile_df, friends, retain_type=0):
     if retain_type == 0:
         #friends_df = friends_df.ix[friends_df.uid_a.isin(users_list) |
         #                           friends_df.uid_b.isin(users_list)]
-        friends_df = [(a, b) for a, b in friends_df if \
+        friends = [(a, b) for a, b in friends if \
             a in users_list or b in users_list]
     else:
-        friends_df = [(a, b) for a, b in friends_df if \
+        friends = [(a, b) for a, b in friends if \
             a in users_list and b in users_list]
 
     try:
 	    profile_df = profile_df.drop("ID")
 	
     # it requires friends_df has column "pair"	
-    ldm.fit(profile_df, friends_df.pair.as_matrix())
+    ldm.fit(profile_df, friends)
     return ldm.get_transform_matrix()
 	
 def hyper_parameter_tester(weights_a, weights_b, fit_rayleigh, num):
