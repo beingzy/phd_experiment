@@ -189,7 +189,7 @@ def users_filter_by_weights(weights, profile_df, friends_networkx,
     return res
 
 
-def ldm_train_with_list(users_list, profile_df, friends_df, retain_type=0):
+def ldm_train_with_list(users_list, profile_df, friends, retain_type=0):
     """ learning distance matrics with ldm() instance, provided with selected
         list of users.
 
@@ -198,10 +198,7 @@ def ldm_train_with_list(users_list, profile_df, friends_df, retain_type=0):
     users_list: {vector-like, integer}, the list of user id
     profile_df: {matrix-like, pandas.DataFrame}, user profile dataframe
         with columns: ["ID", "x0" - "xn"]
-    friends_df: {matrix-like, pandas.DataFrame}, pandas.DataFrame store pair of
-        user ID(s) to represent connections with columns: ["uid_a", "uid_b"]
-    friends_networkx: {networkx.Graph()}, Graph() object from Networkx to store
-        the relationships information
+    friends: {list of tuple}, each tuple keeps a pair of user id
     retain_type: {integer}, 0, adopting 'or' logic by keeping relationship in
         friends_df if either of entities is in user_list 1, adopting 'and'
         logic
@@ -218,19 +215,25 @@ def ldm_train_with_list(users_list, profile_df, friends_df, retain_type=0):
     ldm = LDM()
 	
     if retain_type == 0:
-        friends_df = friends_df.ix[friends_df.uid_a.isin(users_list) |
-                                   friends_df.uid_b.isin(users_list)]
+        #friends_df = friends_df.ix[friends_df.uid_a.isin(users_list) |
+        #                           friends_df.uid_b.isin(users_list)]
+        friends_df = [(a, b) for a, b in friends_df if \
+            a in users_list or b in users_list]
     else:
-        friends_df = friends_df.ix[friends_df.uid_a.isin(users_list) &
-                                   friends_df.uid_b.isin(users_list)]
+        friends_df = [(a, b) for a, b in friends_df if \
+            a in users_list and b in users_list]
 
     try:
 	    profile_df = profile_df.drop("ID")
-		
+	
+    # it requires friends_df has column "pair"	
     ldm.fit(profile_df, friends_df.pair.as_matrix())
     return ldm.get_transform_matrix()
 	
 def hyper_parameter_tester(weights_a, weights_b, fit_rayleigh, num):
+    
+    """
+    """
     
     num_friends = []
     num_nonfriends = []
