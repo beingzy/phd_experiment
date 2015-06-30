@@ -1,3 +1,7 @@
+import scipy as sp
+import numpy as np
+import pandas as pd
+
 from scipy.stats import rayleigh
 from scipy.stats import ks_2samp
 from numpy import linspace
@@ -189,7 +193,7 @@ def users_filter_by_weights(weights, profile_df, friends_networkx,
     return res
 
 
-def ldm_train_with_list(users_list, profile_df, friends, retain_type=0):
+def ldm_train_with_list(users_list, profile_df, friends, retain_type=1):
     """ learning distance matrics with ldm() instance, provided with selected
         list of users.
 
@@ -211,25 +215,19 @@ def ldm_train_with_list(users_list, profile_df, friends, retain_type=0):
     ---------
     new_dist_metrics = ldm_train_with_list(user_list, profile_df, friends_df)
     """
-	
-    ldm = LDM()
-	
     if retain_type == 0:
-        #friends_df = friends_df.ix[friends_df.uid_a.isin(users_list) |
-        #                           friends_df.uid_b.isin(users_list)]
         friends = [(a, b) for a, b in friends if \
             a in users_list or b in users_list]
     else:
         friends = [(a, b) for a, b in friends if \
             a in users_list and b in users_list]
-
-    try:
-	    profile_df = profile_df.drop("ID")
-	
-    # it requires friends_df has column "pair"	
+    
+    ldm = LDM()    
     ldm.fit(profile_df, friends)
-    return ldm.get_transform_matrix()
-	
+    weight_vec = ldm.get_transform_matrix()
+    return weight_vec     
+
+
 def hyper_parameter_tester(weights_a, weights_b, fit_rayleigh, num):
     
     """
