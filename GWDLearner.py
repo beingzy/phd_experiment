@@ -65,7 +65,7 @@ def user_grouped_dist(user_id, weights, profile_df, friends_networkx):
 
 def user_dist_kstest(sim_dist_vec, diff_dist_vec,
                      fit_rayleigh=False, _n=100):
-						 
+
     """ Test the goodness of a given weights to defferentiate friend distance
         distributions and non-friend distance distributions of a given user.
         The distance distribution is considered to follow Rayleigh distribution.
@@ -103,16 +103,16 @@ def user_dist_kstest(sim_dist_vec, diff_dist_vec,
         res = ks_2samp(samp_friend, samp_nonfriend)[1]
     else:
         res = ks_2samp(sim_dist_vec, diff_dist_vec)[1]
-		
+
     return res
 
 
 def users_filter_by_weights(weights, profile_df, friends_networkx,
-                            pval_threshold=0.5, 
+                            pval_threshold=0.5,
                             mutate_rate=0.4,
-                            min_friend_cnt=10, 
+                            min_friend_cnt=10,
                             users_list=None,
-                            fit_rayleigh=False, 
+                            fit_rayleigh=False,
                             _n=1000,
                             is_debug=False):
     """ Split users into two groups, "keep" and "mutate", with respect to
@@ -174,22 +174,38 @@ def users_filter_by_weights(weights, profile_df, friends_networkx,
         pvals.append(pval)
 
     sorted_id_pval = sorted(zip(users_list, pvals), key=lambda x: x[1])
-    good_fits = [i for i, p in sorted_id_pval if p < pval_threshold]
-    bad_fits = [i for i, p in sorted_id_pval if p >= pval_threshold]
-    
+
+    if is_debug:
+        good_fits = [i for i, p in sorted_id_pval if p < pval_threshold]
+        bad_fits = [i for i, p in sorted_id_pval if p >= pval_threshold]
+        good_pvals = [p for i, p in sorted_id_pval if p < pval_threshold]
+        bad_pvals = [p for i, p in sorted_id_pval if p >= pval_threshold]
+    else:
+        good_fits = [i for i, p in sorted_id_pval if p < pval_threshold]
+        bad_fits = [i for i, p in sorted_id_pval if p >= pval_threshold]
+
     if len(bad_fits) > 0:
         mutate_size = np.ceil(len(bad_fits) * mutate_rate)
         mutate_size = max(int(mutate_size), 1)
         id_retain = good_fits + bad_fits[mutate_size:]
         id_mutate = bad_fits[:mutate_size]
+        # split pval
+        if len(good_pvals) > 0 or len(bad_pvals) > 0:
+            pval_retain = good_pvals + bad_pvals[mutate_size:]
+            pval_mutate = bad_pvals[mutate_size:]
     else:
         id_retain = good_fits
         id_mutate = bad_fits
-        
-    if is_debug is True:
-        res = [id_retain, id_mutate, sorted_id_pval]
+
+        if len(good_pvals) > 0 or len(bad_pvals) > 0:
+            pval_retain = pval_retain
+            pval_mutate = bad_pvals
+
+    if is_debug:
+        res = [id_retain, id_mutate, pval_retain, pval_mutate]
     else:
         res = [id_retain, id_mutate]
+
     return res
 
 
@@ -221,46 +237,46 @@ def ldm_train_with_list(users_list, profile_df, friends, retain_type=1):
     else:
         friends = [(a, b) for a, b in friends if \
             a in users_list and b in users_list]
-    
-    ldm = LDM()    
+
+    ldm = LDM()
     ldm.fit(profile_df, friends)
     weight_vec = ldm.get_transform_matrix()
-    return weight_vec     
+    return weight_vec
 
 
 def hyper_parameter_tester(weights_a, weights_b, fit_rayleigh, num):
-    
+
     """
     """
-    
+
     num_friends = []
     num_nonfriends = []
     ks_pvals_right = []
     ks_pvals_wrong = []
 
-    for uid in tg0_ids: 
+    for uid in tg0_ids:
         # Compare the distribution of a user's distances of all of his/her friends
         # against the distribuiton of a users's distances of all of his/her non-friends,
         # The collection of non-friends may include those users of two categories with
-        # respect to their relationships to the target user: 
-        # a. the users who are not likened by the target users 
+        # respect to their relationships to the target user:
+        # a. the users who are not likened by the target users
         # b. the users who are likely to be befriended by the users however
         #    the users do not have a change to be exposed to her/him.
         sim_dists, diff_dists = user_grouped_dist(uid, weights_a, profile_df, fnx)
         pval = user_dist_kstest(sim_dists, diff_dists, fit_rayleigh=fit_rayleigh, _n = num)
         ks_pvals_right.append(pval)
-    
+
         sim_dists, diff_dists = user_grouped_dist(uid, weights_b, profile_df, fnx)
         pval = user_dist_kstest(sim_dists, diff_dists, fit_rayleigh=fit_rayleigh, _n = num)
         ks_pvals_wrong.append(pval)
-    
+
         num_friends.append(len(sim_dists))
         num_nonfriends.append(len(diff_dists))
-    
-    res_report = pd.DataFrame({"ID": tg0_ids, 
-		                       "num_friends": num_friends, 
-                               "num_nonfriends": num_nonfriends, 
+
+    res_report = pd.DataFrame({"ID": tg0_ids,
+		                       "num_friends": num_friends,
+                               "num_nonfriends": num_nonfriends,
                                "true_pval": ks_pvals_right,
                                "wrong_pval": ks_pvals_wrong})
-							   
+
     return res_report
