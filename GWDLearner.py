@@ -190,16 +190,18 @@ def users_filter_by_weights(weights, profile_df, friends_networkx,
         id_retain = good_fits + bad_fits[mutate_size:]
         id_mutate = bad_fits[:mutate_size]
         # split pval
-        if len(good_pvals) > 0 or len(bad_pvals) > 0:
-            pval_retain = good_pvals + bad_pvals[mutate_size:]
-            pval_mutate = bad_pvals[mutate_size:]
+        if is_debug:
+            if len(good_pvals) > 0 or len(bad_pvals) > 0:
+                pval_retain = good_pvals + bad_pvals[mutate_size:]
+                pval_mutate = bad_pvals[mutate_size:]
     else:
         id_retain = good_fits
         id_mutate = bad_fits
 
-        if len(good_pvals) > 0 or len(bad_pvals) > 0:
-            pval_retain = pval_retain
-            pval_mutate = bad_pvals
+        if is_debug:
+            if len(good_pvals) > 0 or len(bad_pvals) > 0:
+                pval_retain = pval_retain
+                pval_mutate = bad_pvals
 
     if is_debug:
         res = [id_retain, id_mutate, pval_retain, pval_mutate]
