@@ -62,7 +62,6 @@ def user_grouped_dist(user_id, weights, profile_df, friends_networkx):
     res = [sim_dist_vec, diff_dist_vec]
     return res
 
-
 def user_dist_kstest(sim_dist_vec, diff_dist_vec,
                      fit_rayleigh=False, _n=100):
 
@@ -115,6 +114,7 @@ def users_filter_by_weights(weights, profile_df, friends_networkx,
                             fit_rayleigh=False,
                             _n=1000,
                             is_debug=False):
+
     """ Split users into two groups, "keep" and "mutate", with respect to
         p-value of the ks-test on the null hypothesis that the distribution of
         friends' weighted distance is not significantly different from the
@@ -276,9 +276,8 @@ def hyper_parameter_tester(weights_a, weights_b, fit_rayleigh, num):
         num_nonfriends.append(len(diff_dists))
 
     res_report = pd.DataFrame({"ID": tg0_ids,
-		                       "num_friends": num_friends,
+    	                       "num_friends": num_friends,
                                "num_nonfriends": num_nonfriends,
                                "true_pval": ks_pvals_right,
                                "wrong_pval": ks_pvals_wrong})
-
     return res_report
