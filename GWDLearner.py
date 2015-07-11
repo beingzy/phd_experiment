@@ -11,6 +11,19 @@ from learning_dist_metrics.ldm import LDM
 from learning_dist_metrics.dist_metrics import weighted_euclidean
 
 
+import scipy as sp
+import numpy as np
+import pandas as pd
+
+from scipy.stats import rayleigh
+from scipy.stats import ks_2samp
+from numpy import linspace
+from numpy.random import choice
+from networkx import Graph
+from learning_dist_metrics.ldm import LDM
+from learning_dist_metrics.dist_metrics import weighted_euclidean
+
+
 def user_grouped_dist(user_id, weights, profile_df, friends_networkx):
     """ Calculate distances between a user and whose friends
         and distance between a user and whose non-friends.
@@ -37,192 +50,7 @@ def user_grouped_dist(user_id, weights, profile_df, friends_networkx):
     user_dist = user_grouped_dist(user_id = 0, weights = weights
         , profile_df, friends_df)
     print user_dist["friends"]
-    print user_dist["nonfriends"]"""
-input info.:
-----------
-profile_df
-friend_networkx
-
-control parameters:
--------------------
-t: fit score type
-
-tuning parameter:
------------------
-threshold: cutoff value for kstest
-c: regularization strength
-min_delta_f: threshold for significant improvement
-max_iter: maxmium number of trivial trial learning in a row
-"""
-# input info
-k = 2
-# user_profile
-
-# tuing parameters
-t = 2
-c = 0.1
-threshold = 0.5
-min_delta_f = 0.02
-max_iter = 10
-
-# initiate the containers:
-dist_metrics = init_dict_list(k) # distance metrics containers
-fit_group = init_dict_list(k)    # members composition in fit groups
-fit_pvals = init_dict_list(k)    # members' pvalue of KStest with their group distance metrics
-unfit_group = init_dict_list(k)  # members is not considerd fit by its group distance metrics
-unfit_pvals = init_dict_list(k)  # pvalues for members in unfit_group (maybe can be deleted)
-buffer_group = []                # members are not considered having fit
-
-# results value
-fs_hist = []       # list of fit scores in sequence (lastest one is the last)
-knowledge_pkg = [] # {index: {"dist_metrics", "fit_group", "buffer_group"}}
-
-# calculate the the init distance metrics
-
-# sampling is subset of users to calculate
-# the distance metrics is good method
-
-# dist_metrics: ldm() with subset of users
-# fit_group: subsets of users
-# buffer_group: useres are not sampled
-
-# provide initial composition of fit_group
-# and buffer_group for iterative learning
-# procedure
-# the even sampling strategy is implemeted
-# here, however,
-samp_size = len(all_uids) / k
-samp_sizes = [samp_size] * k
-all_uids_copy = [i for i in all_uids]
-
-# generate k groups of sample user groups
-for g, samp_size in zip(range(k), samp_sizes):
-    # draw samples and assign them to fit_group
-    samples = choice(all_uids_copy, samp_size, replace=False)
-    fit_group[g] = list(samples)
-    # remove samples from population pool
-    for uid in samples:
-        all_uids_copy.remove(uid)
-
-# initiate fit user pvals
-for g, uids in fit_group.iteritems():
-    fit_pvals[g] = [0] * len(uids)
-
-# if len(all_uids_copy) > 0:
-#     buffer_group = all_uids_copy
-# else:
-#    buffer_group = []
-
-_no_imp_counter = 0
-_loop_counter = 0
-
-while _no_imp_counter < max_iter:
-
-    _loop_counter += 1
-    print "%d iteration is in processing ..." % _loop_counter
-    # step 01: learn distance metrics
-    for g, uids in fit_group.iteritems():
-        # learn distance metrics
-        # here to update the computational mechanism
-        dist = [np.random.uniform(0, 1, 1)[0] for i in range(4)]
-        dist_metrics[g] = dist
-
-    # step 02: update the member composite with updated group
-    # distance metrics threshold is needed to be defined
-    fit_group_copy = {k:[i for i in v] for k, v in fit_group.iteritems()}
-    for g, uids in fit_group_copy.iteritems():
-        target_dist = dist_metrics[g]
-        for uid in uids:
-
-            # calcualte the ks-pvalue with update distance metrics
-            # target_dist
-            pval = np.random.uniform(0, 1, 1)[0] #----- update needed ------- #
-
-            if pval >= threshold:
-                # remove the user and its information
-                # from relevant container
-                idx = [i for i, u in enumerate(fit_group[g]) if u == uid][0]
-                fit_group[g].pop(idx)
-                # fit_group[g].remove(uid)
-                fit_pvals[g].pop(idx)
-
-                # add the user to the unfit_group
-                if g in unfit_group:
-                    unfit_group[g].append(uid)
-                else:
-                    unfit_group[g] = [uid]
-
-            else:
-                idx = [i for i, u in enumerate(fit_group[g]) if u == uid][0]
-                fit_pvals[g][idx] = pval
-
-    tot_fit_group = np.sum([len(u) for g, u in fit_group.iteritems()])
-    tot_unfit_group = np.sum([len(u) for g, u in unfit_group.iteritems()])
-    tot_buffer_group = len(buffer_group)
-    print "1) #fit: %d, #unfit: %d, #buffer: %d" % (tot_fit_group, tot_unfit_group, tot_buffer_group)
-
-    # step 03: test members in unfit_group to see
-    # if it has a good fit with other distmetrics
-    # make a copy of the buffer group container
-    buffer_group_copy = [i for i in buffer_group]
-    if len(buffer_group_copy) > 0:
-        for uid in buffer_group_copy:
-            new_group, new_pval = find_fit_group(uid, dist_metrics, threshold)
-            if new_group is not None:
-                buffer_group.remove(uid)
-                if new_group in fit_group:
-                    fit_group[new_group].append(uid)
-                    fit_pvals[new_group].append(new_pval)
-                else:
-                    fit_group[new_group] = [uid]
-                    fit_pvals[new_group] = [new_pval]
-
-
-    tot_fit_group = np.sum([len(u) for g, u in fit_group.iteritems()])
-    tot_unfit_group = np.sum([len(u) for g, u in unfit_group.iteritems()])
-    tot_buffer_group = len(buffer_group)
-    print "2) #fit: %d, #unfit: %d, #buffer: %d" % (tot_fit_group, tot_unfit_group, tot_buffer_group)
-
-    unfit_group_copy = {k:[i for i in v] for k, v in unfit_group.iteritems()}
-    for g, uids in unfit_group_copy.iteritems():
-        for uid in uids:
-            new_group, new_pval = find_fit_group(uid, dist_metrics, threshold, g)
-            unfit_group[g].remove(uid)
-
-            if new_pval is None:
-                buffer_group.append(uid)
-            else:
-                if new_group in fit_group:
-                    fit_group[new_group].append(uid)
-                    fit_pvals[new_group].append(new_pval)
-                else:
-                    fit_group[new_group] = [uid]
-                    fit_pvals[new_group] = [new_pval]
-
-    tot_fit_group = np.sum([len(u) for g, u in fit_group.iteritems()])
-    tot_unfit_group = np.sum([len(u) for g, u in unfit_group.iteritems()])
-    tot_buffer_group = len(buffer_group)
-    print "3) #fit: %d, #unfit: %d, #buffer: %d" % (tot_fit_group, tot_unfit_group, tot_buffer_group)
-
-    # step 04: calculate fit score
-    fs = get_fit_score(fit_pvals, buffer_group, c=c, t=1)
-    fs_hist.append(fs)
-
-    # step 05: evaluate stop criteria
-    package = {"dist_metrics": dist_metrics,
-               "fit_group": fit_group,
-               "buffer_group": buffer_group}
-
-    knowledge_pkg.append(package)
-    best_fs = min(fs_hist)
-
-    if best_fs - fs <= min_delta_f:
-        _no_imp_counter += _no_imp_counter
-    else:
-        _no_imp_counter = 0
-
-    # print "fit score (type-%d): %.3f" % (t, fs)
-    # print "best fit score: %.3f" % best_fs
+    print user_dist["nonfriends"]
     """
     cols = [col for col in profile_df.columns if col is not "ID"]
     # get the user profile information of the target users
@@ -246,6 +74,7 @@ while _no_imp_counter < max_iter:
 
     res = [sim_dist_vec, diff_dist_vec]
     return res
+
 
 def user_dist_kstest(sim_dist_vec, diff_dist_vec,
                      fit_rayleigh=False, _n=100):
@@ -299,7 +128,6 @@ def users_filter_by_weights(weights, profile_df, friends_networkx,
                             fit_rayleigh=False,
                             _n=1000,
                             is_debug=False):
-
     """ Split users into two groups, "keep" and "mutate", with respect to
         p-value of the ks-test on the null hypothesis that the distribution of
         friends' weighted distance is not significantly different from the
@@ -461,195 +289,197 @@ def hyper_parameter_tester(weights_a, weights_b, fit_rayleigh, num):
         num_nonfriends.append(len(diff_dists))
 
     res_report = pd.DataFrame({"ID": tg0_ids,
-    	                       "num_friends": num_friends,
+		                       "num_friends": num_friends,
                                "num_nonfriends": num_nonfriends,
                                "true_pval": ks_pvals_right,
                                "wrong_pval": ks_pvals_wrong})
+
     return res_report
 
 
-def learning_wrapper():
-"""
-input info.:
-----------
-profile_df
-friend_networkx
 
-control parameters:
--------------------
-t: fit score type
+def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
+                     n=1000, min_delta_f=0.02, max_iter=10):
+    """ learn the groupings and group-wise
 
-tuning parameter:
------------------
-threshold: cutoff value for kstest
-c: regularization strength
-min_delta_f: threshold for significant improvement
-max_iter: maxmium number of trivial trial learning in a row
-"""
-# input info
-k = 2
-# user_profile
+    input info.:
+    ----------
+    profile_df
+    friends_pair: {list}
+    k: {integer}, # of groups in the population
+    t: {integ}, type of fit score
+    c: {float}, strength of penalty for larger size of buffer group
+    threshold: {float}, from 0 to 1, the threshold for ks-test
+    n: {integer}, the samples of Rayleigh distribution for ks-test,
+        it influence the sensitivity of KS-test
+    min_delta_f: {float}, minmal reduction considered substantial improvement
+    max_iter: {integer}, maxmium number of sequential iterations with
+        non-substantial improvement in fit score
 
-# tuing parameters
-t = 2
-c = 0.1
-threshold = 0.5
-n = 1000 # ks-test sample size for rayleigh
-min_delta_f = 0.02
-max_iter = 10
+    control parameters:
+    -------------------
+    t: fit score type
 
-# initiate the containers:
-dist_metrics = init_dict_list(k) # distance metrics containers
-fit_group = init_dict_list(k)    # members composition in fit groups
-fit_pvals = init_dict_list(k)    # members' pvalue of KStest with their group distance metrics
-unfit_group = init_dict_list(k)  # members is not considerd fit by its group distance metrics
-unfit_pvals = init_dict_list(k)  # pvalues for members in unfit_group (maybe can be deleted)
-buffer_group = []                # members are not considered having fit
+    tuning parameter:
+    -----------------
+    threshold: cutoff value for kstest
+    c: regularization strength
+    min_delta_f: threshold for significant improvement
+    max_iter: maxmium number of trivial trial learning in a row
+    """
 
-# results value
-fs_hist = []       # list of fit scores in sequence (lastest one is the last)
-knowledge_pkg = [] # {index: {"dist_metrics", "fit_group", "buffer_group"}}
+    from networkx import Graph
 
-# calculate the the init distance metrics
+    # convert pair-wise relationship data into Graph
+    friend_networkx = Graph()
+    friend_networkx.add_edges_from(friends_pair)
 
-# sampling is subset of users to calculate
-# the distance metrics is good method
+    # initiate the containers:
+    # dist_metrics: ldm() with subset of users
+    # fit_group: subsets of users
+    # buffer_group: useres are not sampled
+    dist_metrics = init_dict_list(k) # distance metrics containers
+    fit_group    = init_dict_list(k)    # members composition in fit groups
+    fit_pvals    = init_dict_list(k)    # members' pvalue of KStest with their group distance metrics
+    unfit_group  = init_dict_list(k)  # members is not considerd fit by its group distance metrics
+    unfit_pvals  = init_dict_list(k)  # pvalues for members in unfit_group (maybe can be deleted)
+    buffer_group = []                # members are not considered having fit
 
-# dist_metrics: ldm() with subset of users
-# fit_group: subsets of users
-# buffer_group: useres are not sampled
+    # results container
+    fs_hist = []       # list of fit scores in sequence (lastest one is the last)
+    knowledge_pkg = [] # {index: {"dist_metrics", "fit_group", "buffer_group"}}
 
-# provide initial composition of fit_group
-# and buffer_group for iterative learning
-# procedure
-# the even sampling strategy is implemeted
-# here, however,
-samp_size = len(all_uids) / k
-samp_sizes = [samp_size] * k
-all_uids_copy = [i for i in all_uids]
+    # provide initial composition of fit_group
+    # and buffer_group for iterative learning
+    # procedure
+    # the even size sampling strategy is implemeted
+    # here, however,
+    # benford's law can be used as alternative stratgey
+    samp_size = len(all_uids) / k
+    samp_sizes = [samp_size] * k
+    all_uids_copy = [i for i in all_uids]
 
-# generate k groups of sample user groups
-for g, samp_size in zip(range(k), samp_sizes):
-    # draw samples and assign them to fit_group
-    samples = choice(all_uids_copy, samp_size, replace=False)
-    fit_group[g] = list(samples)
-    # remove samples from population pool
-    for uid in samples:
-        all_uids_copy.remove(uid)
+    # generate k groups of sample user groups
+    for g, samp_size in zip(range(k), samp_sizes):
+        # draw samples and assign them to fit_group
+        samples = choice(all_uids_copy, samp_size, replace=False)
+        fit_group[g] = list(samples)
+        # remove samples from population pool
+        for uid in samples:
+            all_uids_copy.remove(uid)
 
-# initiate fit user pvals
-for g, uids in fit_group.iteritems():
-    fit_pvals[g] = [0] * len(uids)
-
-# if len(all_uids_copy) > 0:
-#     buffer_group = all_uids_copy
-# else:
-#    buffer_group = []
-
-_no_imp_counter = 0
-_loop_counter = 0
-
-while _no_imp_counter < max_iter:
-
-    _loop_counter += 1
-    print "%d iteration is in processing ..." % _loop_counter
-
-    # step 01: learn distance metrics
+    # initiate fit user pvals
     for g, uids in fit_group.iteritems():
-        # learn distance metrics
-        # here to update the computational mechanism
-        # dist = [np.random.uniform(0, 1, 1)[0] for i in range(4)]
-        dist = ldm_train_with_list(uids, profile_df, friends_ls)
-        dist_metrics[g] = dist
+        fit_pvals[g] = [0] * len(uids)
 
-    # step 02: update the member composite with updated group
-    # distance metrics threshold is needed to be defined
-    fit_group_copy = {k:[i for i in v] for k, v in fit_group.iteritems()}
-    for g, uids in fit_group_copy.iteritems():
-        target_dist = dist_metrics[g]
-        for uid in uids:
+    # time counter()
+    durations = []
 
-            # calcualte the ks-pvalue with update distance metrics
-            # target_dist
-            # pval = np.random.uniform(0, 1, 1)[0] #----- update needed ------- #
-            sdist, ddist = user_grouped_dist(uid, dist_metrics, profile_df,
-                                         friends_networkx)
-            pval = user_dist_kstest(sdist, ddist, fit_rayleigh=True, _n=n)
+    # iteration meter
+    _no_imp_counter = 0
+    _loop_counter = 0
 
-            if pval >= threshold:
-                # remove the user and its information
-                # from relevant container
-                idx = [i for i, u in enumerate(fit_group[g]) if u == uid][0]
-                fit_group[g].pop(idx)
-                # fit_group[g].remove(uid)
-                fit_pvals[g].pop(idx)
+# while _no_imp_counter < max_iter:
 
-                # add the user to the unfit_group
-                if g in unfit_group:
-                    unfit_group[g].append(uid)
-                else:
-                    unfit_group[g] = [uid]
+#     _loop_counter += 1
+#     print "%d iteration is in processing ..." % _loop_counter
 
-            else:
-                idx = [i for i, u in enumerate(fit_group[g]) if u == uid][0]
-                fit_pvals[g][idx] = pval
+#     # step 01: learn distance metrics
+#     for g, uids in fit_group.iteritems():
+#         # learn distance metrics
+#         # here to update the computational mechanism
+#         # dist = [np.random.uniform(0, 1, 1)[0] for i in range(4)]
+#         dist = ldm_train_with_list(uids, profile_df, friends_ls)
+#         dist_metrics[g] = dist
 
-    # tot_fit_group = np.sum([len(u) for g, u in fit_group.iteritems()])
-    # tot_unfit_group = np.sum([len(u) for g, u in unfit_group.iteritems()])
-    # tot_buffer_group = len(buffer_group)
-    # print "1) #fit: %d, #unfit: %d, #buffer: %d" % (tot_fit_group, tot_unfit_group, tot_buffer_group)
+#     # step 02: update the member composite with updated group
+#     # distance metrics threshold is needed to be defined
+#     fit_group_copy = {k:[i for i in v] for k, v in fit_group.iteritems()}
+#     for g, uids in fit_group_copy.iteritems():
+#         target_dist = dist_metrics[g]
+#         for uid in uids:
 
-    # step 03: test members in unfit_group to see
-    # if it has a good fit with other distmetrics
-    # make a copy of the buffer group container
-    buffer_group_copy = [i for i in buffer_group]
-    if len(buffer_group_copy) > 0:
-        for uid in buffer_group_copy:
-            new_group, new_pval = find_fit_group(uid, dist_metrics, threshold)
-            if new_group is not None:
-                buffer_group.remove(uid)
-                if new_group in fit_group:
-                    fit_group[new_group].append(uid)
-                    fit_pvals[new_group].append(new_pval)
-                else:
-                    fit_group[new_group] = [uid]
-                    fit_pvals[new_group] = [new_pval]
+#             # calcualte the ks-pvalue with update distance metrics
+#             # target_dist
+#             # pval = np.random.uniform(0, 1, 1)[0] #----- update needed ------- #
+#             sdist, ddist = user_grouped_dist(uid, dist_metrics, profile_df,
+#                                          friends_networkx)
+#             pval = user_dist_kstest(sdist, ddist, fit_rayleigh=True, _n=n)
 
-    unfit_group_copy = {k:[i for i in v] for k, v in unfit_group.iteritems()}
-    for g, uids in unfit_group_copy.iteritems():
-        for uid in uids:
-            new_group, new_pval = find_fit_group(uid, dist_metrics, threshold, g)
-            unfit_group[g].remove(uid)
+#             if pval >= threshold:
+#                 # remove the user and its information
+#                 # from relevant container
+#                 idx = [i for i, u in enumerate(fit_group[g]) if u == uid][0]
+#                 fit_group[g].pop(idx)
+#                 # fit_group[g].remove(uid)
+#                 fit_pvals[g].pop(idx)
 
-            if new_pval is None:
-                buffer_group.append(uid)
-            else:
-                if new_group in fit_group:
-                    fit_group[new_group].append(uid)
-                    fit_pvals[new_group].append(new_pval)
-                else:
-                    fit_group[new_group] = [uid]
-                    fit_pvals[new_group] = [new_pval]
+#                 # add the user to the unfit_group
+#                 if g in unfit_group:
+#                     unfit_group[g].append(uid)
+#                 else:
+#                     unfit_group[g] = [uid]
 
-    # step 04: calculate fit score
-    fs = get_fit_score(fit_pvals, buffer_group, c=c, t=1)
-    fs_hist.append(fs)
+#             else:
+#                 idx = [i for i, u in enumerate(fit_group[g]) if u == uid][0]
+#                 fit_pvals[g][idx] = pval
 
-    # step 05: evaluate stop criteria
-    package = {"dist_metrics": dist_metrics,
-               "fit_group": fit_group,
-               "buffer_group": buffer_group}
+#     # tot_fit_group = np.sum([len(u) for g, u in fit_group.iteritems()])
+#     # tot_unfit_group = np.sum([len(u) for g, u in unfit_group.iteritems()])
+#     # tot_buffer_group = len(buffer_group)
+#     # print "1) #fit: %d, #unfit: %d, #buffer: %d" % (tot_fit_group, tot_unfit_group, tot_buffer_group)
 
-    knowledge_pkg.append(package)
-    best_fs = min(fs_hist)
+#     # step 03: test members in unfit_group to see
+#     # if it has a good fit with other distmetrics
+#     # make a copy of the buffer group container
+#     buffer_group_copy = [i for i in buffer_group]
+#     if len(buffer_group_copy) > 0:
+#         for uid in buffer_group_copy:
+#             new_group, new_pval = find_fit_group(uid, dist_metrics, threshold)
+#             if new_group is not None:
+#                 buffer_group.remove(uid)
+#                 if new_group in fit_group:
+#                     fit_group[new_group].append(uid)
+#                     fit_pvals[new_group].append(new_pval)
+#                 else:
+#                     fit_group[new_group] = [uid]
+#                     fit_pvals[new_group] = [new_pval]
 
-    if best_fs - fs <= min_delta_f:
-        _no_imp_counter += _no_imp_counter
-    else:
-        _no_imp_counter = 0
+#     unfit_group_copy = {k:[i for i in v] for k, v in unfit_group.iteritems()}
+#     for g, uids in unfit_group_copy.iteritems():
+#         for uid in uids:
+#             new_group, new_pval = find_fit_group(uid, dist_metrics, threshold, g)
+#             unfit_group[g].remove(uid)
 
-    # print "fit score (type-%d): %.3f" % (t, fs)
-    # print "best fit score: %.3f" % best_fs
-best_idx = [fs for fs in fs_hist if fs == best_fs]
-best_knowledge = knowledge_pkg[best_idx]
-return (best_knowledge, best_fs)
+#             if new_pval is None:
+#                 buffer_group.append(uid)
+#             else:
+#                 if new_group in fit_group:
+#                     fit_group[new_group].append(uid)
+#                     fit_pvals[new_group].append(new_pval)
+#                 else:
+#                     fit_group[new_group] = [uid]
+#                     fit_pvals[new_group] = [new_pval]
+
+#     # step 04: calculate fit score
+#     fs = get_fit_score(fit_pvals, buffer_group, c=c, t=1)
+#     fs_hist.append(fs)
+
+#     # step 05: evaluate stop criteria
+#     package = {"dist_metrics": dist_metrics,
+#                "fit_group": fit_group,
+#                "buffer_group": buffer_group}
+
+#     knowledge_pkg.append(package)
+#     best_fs = min(fs_hist)
+
+#     if best_fs - fs <= min_delta_f:
+#         _no_imp_counter += _no_imp_counter
+#     else:
+#         _no_imp_counter = 0
+
+#     # print "fit score (type-%d): %.3f" % (t, fs)
+#     # print "best fit score: %.3f" % best_fs
+# best_idx = [fs for fs in fs_hist if fs == best_fs]
+# best_knowledge = knowledge_pkg[best_idx]
+# return (best_knowledge, best_fs)
