@@ -24,7 +24,7 @@ from learning_dist_metrics.ldm import LDM
 from learning_dist_metrics.dist_metrics import weighted_euclidean
 
 
-def user_grouped_dist(user_id, weights, profile_df, friends_networkx):
+def user_grouped_dist(user_id, weights, profile_df, friend_networkx):
     """ Calculate distances between a user and whose friends
         and distance between a user and whose non-friends.
         The groupped distance vector will be output.
@@ -36,7 +36,7 @@ def user_grouped_dist(user_id, weights, profile_df, friends_networkx):
         is extracted by LDM().fit(x, y).get_transform_matrix()
     * profile_df: {matrix-like, pandas.DataFrame}, user profile dataframe
         with columns: ["ID", "x0" - "xn"]
-    * friends_networkx: {networkx.Graph()}, Graph() object from Networkx
+    * friend_networkx: {networkx.Graph()}, Graph() object from Networkx
         to store the relationships informat
     Returns:
     -------
@@ -55,14 +55,18 @@ def user_grouped_dist(user_id, weights, profile_df, friends_networkx):
     cols = [col for col in profile_df.columns if col is not "ID"]
     # get the user profile information of the target users
     user_profile = profile_df.ix[profile_df.ID == user_id, cols].as_matrix()
+    # user_row = profile_df.ix[profile_df.ID == user_id, cols]
+    # user_profile = user_row.values.tolist()[0]
     # get the user_id of friends of the target user
-    friends_ls = friends_networkx.neighbors(user_id)
+    friends_ls = friend_networkx.neighbors(user_id)
     all_ids = profile_df.ID
     non_friends_ls = [u for u in all_ids if u not in friends_ls + [user_id]]
 
     sim_dist_vec = []
     for f_id in friends_ls:
         friend_profile = profile_df.ix[profile_df.ID == f_id, cols].as_matrix()
+        # friend_row = profile_df.ix[profile_df.ID == f_id, cols]
+        # friend_profile = friend_row.values.tolist()[0]
         the_dist = weighted_euclidean(user_profile, friend_profile, weights)
         sim_dist_vec.append(the_dist)
 
@@ -258,74 +262,159 @@ def ldm_train_with_list(users_list, profile_df, friends, retain_type=1):
     weight_vec = ldm.get_transform_matrix()
     return weight_vec
 
-
-def hyper_parameter_tester(weights_a, weights_b, fit_rayleigh, num):
-
+def init_embed_list(n):
     """
     """
+    ls = []
+    for i in range(n):
+        ls.append([])
+    return ls
 
-    num_friends = []
-    num_nonfriends = []
-    ks_pvals_right = []
-    ks_pvals_wrong = []
+def init_dict_list(k):
+    """ create dictionary with k items, each
+        item is a empty list
+    """
+    res_dict = {}
+    for i in range(k):
+        res_dict[i] = []
+    return res_dict
 
-    for uid in tg0_ids:
-        # Compare the distribution of a user's distances of all of his/her friends
-        # against the distribuiton of a users's distances of all of his/her non-friends,
-        # The collection of non-friends may include those users of two categories with
-        # respect to their relationships to the target user:
-        # a. the users who are not likened by the target users
-        # b. the users who are likely to be befriended by the users however
-        #    the users do not have a change to be exposed to her/him.
-        sim_dists, diff_dists = user_grouped_dist(uid, weights_a, profile_df, fnx)
-        pval = user_dist_kstest(sim_dists, diff_dists, fit_rayleigh=fit_rayleigh, _n = num)
-        ks_pvals_right.append(pval)
 
-        sim_dists, diff_dists = user_grouped_dist(uid, weights_b, profile_df, fnx)
-        pval = user_dist_kstest(sim_dists, diff_dists, fit_rayleigh=fit_rayleigh, _n = num)
-        ks_pvals_wrong.append(pval)
+def find_fit_group(uid, dist_metrics, profile_df,
+                   friend_networkx, threshold=0.5,  current_group = None):
+    """ calculate user p-value for the distance metrics of
+        each group
 
-        num_friends.append(len(sim_dists))
-        num_nonfriends.append(len(diff_dists))
+    Parameters:
+    ----------
+    uid: {integer}, user id
+    dist_metrics: {dictionary}, all {index: distance_metrics}
+    profile_df: {DataFrame}, user profile includes "ID" column
+    friend_networkx: {networkx.Graph}, user relationships
+    threshold: {float}, threshold for qualifying pvalue of ks-test
+    current_group: {integer}, group index
 
-    res_report = pd.DataFrame({"ID": tg0_ids,
-		                       "num_friends": num_friends,
-                               "num_nonfriends": num_nonfriends,
-                               "true_pval": ks_pvals_right,
-                               "wrong_pval": ks_pvals_wrong})
+    Resutls:
+    --------
+    res: {list}, [group_idx, pvalue]
+    """
+    if current_group is None:
+        other_group = dist_metrics.keys()
+        other_dist_metrics = dist_metrics.values()
+    else:
+        other_group = [i for i in dist_metrics.keys() if i != current_group]
+        other_dist_metrics = [d for g, d in dist_metrics.iteritems() if g != current_group]
 
-    return res_report
+    if len(other_dist_metrics) > 0:
+        # only excute this is at least one alternative group
+        pvals = []
 
+        for d in other_dist_metrics:
+            # loop through all distance metrics and calculate
+            # p-value of ks-test by applying it to the user
+            # relationships
+            sdist, ddist = user_grouped_dist(user_id=uid, weights=d,
+                        profile_df=profile_df, friend_networkx=friend_networkx)
+            pval = user_dist_kstest(sim_dist_vec=sdist, diff_dist_vec=ddist,
+                                fit_rayleigh=True, _n=1000)
+            pvals.append(pval)
+
+        min_pval = min(pvals)[0]
+        min_index = [i for i, p in enumerate(pvals) if p == min_pval][0]
+        best_group = other_group[min_index]
+
+        if min_pval >= threshold:
+            # if min_pval >= threshold, user is not considered
+            # to have a good fit by any of distance metrics
+            best_group = None
+            min_pval = None
+
+    else:
+        best_group = None
+        min_pval = None
+
+    return (best_group, min_pval)
+
+def get_fit_score(fit_pvals, buffer_group, c, t=2):
+    """ calculate the fit score given the member composite
+        and its pvalues with its group distance metrics, with
+        c determinng the strength of penalty for keeping a
+        larger number of users in buffer_group
+
+    Parameters:
+    -----------
+    fit_pvals: {dict}, {index: [pvalues]}
+    buffer_group: {list}, [userid, ...]
+    c: {float},
+    t: {integer} 1, 2 or 3, type of fit score
+
+    Returns:
+    --------
+    fit_score: {float}, fit score, a smaller value indidcate
+                a overall better fit
+
+    Examples:
+    ---------
+    fit_group = fit_group
+    fit_pvals = fit_pvals
+    buffer_group = buffer_group
+    c = 0.1
+    fscore = get_fit_score(fit_group, fit_pvals, buffer_group, c)
+    """
+
+    # weighted sum of pvalues
+    if t not in [1, 2, 3]:
+        raise NameError('Error: type (t) is not legal value (1 or 2)!')
+
+    wsum_pval = 0
+    if t == 1:
+        for g, v in fit_pvals.iteritems():
+            wsum_pval += sum(np.array(v) * 1.0 / len(v))
+    if t == 2:
+        for g, v in fit_pvals.iteritems():
+            wsum_pval += sum(np.array(v)) * 1.0 / (len(v) * len(v))
+    if t == 3:
+        num_users = 0
+        for g, v in fit_pvals.iteritems():
+            wsum_pval += sum(np.array(v)) * 1.0 / (len(v) * len(v))
+            num_users += len(v)
+        wsum_pval = num_users * 1.0 * wsum_pval
+
+    penalty = c * len(buffer_group)
+    fit_score = wsum_pval + penalty # smaller value indicates a better overall fit
+
+    return fit_score
 
 
 def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
-                     n=1000, min_delta_f=0.02, max_iter=10):
-    """ learn the groupings and group-wise
+                     min_size_group=10, min_delta_f=0.02,
+                     max_iter=10, n=1000):
+    """ learn the groupings and group-wise distance metrics
 
-    input info.:
+    Parameters:
     ----------
-    profile_df
-    friends_pair: {list}
+    profile_df: {pd.DataFrame}, with column ID and other attributes
+    friends_pair: {list}, consisted of tuples of user id pairs
     k: {integer}, # of groups in the population
     t: {integ}, type of fit score
     c: {float}, strength of penalty for larger size of buffer group
     threshold: {float}, from 0 to 1, the threshold for ks-test
-    n: {integer}, the samples of Rayleigh distribution for ks-test,
-        it influence the sensitivity of KS-test
+    min_size_group: {integer}, minimal group size
     min_delta_f: {float}, minmal reduction considered substantial improvement
     max_iter: {integer}, maxmium number of sequential iterations with
         non-substantial improvement in fit score
+    n: {integer}, the samples of Rayleigh distribution for ks-test,
+        it influence the sensitivity of KS-test
 
-    control parameters:
-    -------------------
-    t: fit score type
+    Returns:
+    -------
+    res: {tuple}, (best_knowledge, best_fs)
+    best_knowledge: {dictionary}, {"dist_metrics", "fit_group", "buffer_group"}
+    best_fs: {float}, best fit score
 
-    tuning parameter:
-    -----------------
-    threshold: cutoff value for kstest
-    c: regularization strength
-    min_delta_f: threshold for significant improvement
-    max_iter: maxmium number of trivial trial learning in a row
+    Examples:
+    --------
+    learning_wrapper(profile_df, friends_pair, k=2)
     """
 
     from networkx import Graph
@@ -375,11 +464,11 @@ def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
     # time counter()
     durations = []
 
-    # iteration meter
+    # iteration meters
     _no_imp_counter = 0
     _loop_counter = 0
 
-# while _no_imp_counter < max_iter:
+    while _no_imp_counter < max_iter:
 
 #     _loop_counter += 1
 #     print "%d iteration is in processing ..." % _loop_counter
