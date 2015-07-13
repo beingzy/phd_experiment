@@ -386,8 +386,9 @@ def get_fit_score(fit_pvals, buffer_group, c, t=2):
 
 
 def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
+                     threshold_max=0.5, threshold_min=0.2,
                      min_size_group=10, min_delta_f=0.02,
-                     max_iter=10, n=1000):
+                     max_iter=5, n=1000):
     """ learn the groupings and group-wise distance metrics
 
     Parameters:
@@ -397,7 +398,8 @@ def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
     k: {integer}, # of groups in the population
     t: {integ}, type of fit score
     c: {float}, strength of penalty for larger size of buffer group
-    threshold: {float}, from 0 to 1, the threshold for ks-test
+    threshold_max: {float}, from 0 to 1, the initial threshold for ks-test
+    threshold_min: {float}, form 0 to 1, the mimum possible threhsold for ks-test
     min_size_group: {integer}, minimal group size
     min_delta_f: {float}, minmal reduction considered substantial improvement
     max_iter: {integer}, maxmium number of sequential iterations with
@@ -436,6 +438,7 @@ def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
     # results container
     fs_hist = []       # list of fit scores in sequence (lastest one is the last)
     knowledge_pkg = [] # {index: {"dist_metrics", "fit_group", "buffer_group"}}
+    threhold = threshold_max
 
     # provide initial composition of fit_group
     # and buffer_group for iterative learning
@@ -470,8 +473,8 @@ def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
 
     while _no_imp_counter < max_iter:
 
-         _loop_counter += 1
-         print "%d iteration is in processing ..." % _loop_counter
+        _loop_counter += 1
+        print "%d iteration is in processing ..." % _loop_counter
 
         # step 01: learn distance metrics
         for g, uids in fit_group.iteritems():
@@ -490,11 +493,8 @@ def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
          fit_group_copy = {k:[i for i in v] for k, v in fit_group.iteritems()}
          for g, uids in fit_group_copy.iteritems():
              target_dist = dist_metrics[g]
-              for uid in uids:
 
-             # calcualte the ks-pvalue with update distance metrics
-             # target_dist
-             # pval = np.random.uniform(0, 1, 1)[0] #----- update needed ------- #
+              for uid in uids:
                  sdist, ddist = user_grouped_dist(uid, dist_metrics, profile_df,
                                           friends_networkx)
                  pval = user_dist_kstest(sdist, ddist, fit_rayleigh=True, _n=n)
@@ -570,9 +570,11 @@ def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
              _no_imp_counter += _no_imp_counter
          else:
              _no_imp_counter = 0
+             if threshold > threshold_min:
+                 threshold -= 0.01
 
      # print "fit score (type-%d): %.3f" % (t, fs)
      # print "best fit score: %.3f" % best_fs
-     best_idx = [fs for fs in fs_hist if fs == best_fs]
+     best_idx = [i for i, fs in enumerate(fs_hist) if fs == best_fs]
      best_knowledge = knowledge_pkg[best_idx]
      return (best_knowledge, best_fs)
