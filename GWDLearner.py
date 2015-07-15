@@ -488,93 +488,88 @@ def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
                 num_feat = profile_df.shape[1] - 1
                 ist_metrics[g] = [1] * num_feat
 
-         # step 02: update the member composite with updated group
-         # distance metrics threshold is needed to be defined
-         fit_group_copy = {k:[i for i in v] for k, v in fit_group.iteritems()}
-         for g, uids in fit_group_copy.iteritems():
-             target_dist = dist_metrics[g]
+        # step 02: update the member composite with updated group
+        # distance metrics threshold is needed to be defined
+        fit_group_copy = {k:[i for i in v] for k, v in fit_group.iteritems()}
+        for g, uids in fit_group_copy.iteritems():
+            target_dist = dist_metrics[g]
 
-              for uid in uids:
-                 sdist, ddist = user_grouped_dist(uid, dist_metrics, profile_df,
+            for uid in uids:
+                sdist, ddist = user_grouped_dist(uid, dist_metrics, profile_df,
                                           friends_networkx)
-                 pval = user_dist_kstest(sdist, ddist, fit_rayleigh=True, _n=n)
+                pval = user_dist_kstest(sdist, ddist, fit_rayleigh=True, _n=n)
 
-                 if pval >= threshold:
-                     # remove the user and its information
-                     # from relevant container
-                     idx = [i for i, u in enumerate(fit_group[g]) if u == uid][0]
-                     fit_group[g].pop(idx)
-                     fit_pvals[g].pop(idx)
+                if pval >= threshold:
+                    # remove the user and its information
+                    # from relevant container
+                    idx = [i for i, u in enumerate(fit_group[g]) if u == uid][0]
+                    fit_group[g].pop(idx)
+                    fit_pvals[g].pop(idx)
 
                      # add the user to the unfit_group
-                     if g in unfit_group:
-                         unfit_group[g].append(uid)
-                     else:
-                         unfit_group[g] = [uid]
+                    if g in unfit_group:
+                        unfit_group[g].append(uid)
+                    else:
+                        unfit_group[g] = [uid]
 
-                 else:
-                     idx = [i for i, u in enumerate(fit_group[g]) if u == uid][0]
-                     fit_pvals[g][idx] = pval
+                else:
+                    idx = [i for i, u in enumerate(fit_group[g]) if u == uid][0]
+                    fit_pvals[g][idx] = pval
 
-         # tot_fit_group = np.sum([len(u) for g, u in fit_group.iteritems()])
-         # tot_unfit_group = np.sum([len(u) for g, u in unfit_group.iteritems()])
-         # tot_buffer_group = len(buffer_group)
-         # print "1) #fit: %d, #unfit: %d, #buffer: %d" % (tot_fit_group,
-         # tot_unfit_group, tot_buffer_group)
 
-         # step 03: test members in unfit_group to see
-         # if it has a good fit with other distmetrics
-         # make a copy of the buffer group container
-         buffer_group_copy = [i for i in buffer_group]
-         if len(buffer_group_copy) > 0:
-             for uid in buffer_group_copy:
-                 new_group, new_pval = find_fit_group(uid, dist_metrics, threshold)
-                 if new_group is not None:
-                     buffer_group.remove(uid)
-                     if new_group in fit_group:
-                         fit_group[new_group].append(uid)
-                         fit_pvals[new_group].append(new_pval)
-                     else:
+        # step 03: test members in unfit_group to see
+        # if it has a good fit with other distmetrics
+        # make a copy of the buffer group container
+        buffer_group_copy = [i for i in buffer_group]
+        if len(buffer_group_copy) > 0:
+            for uid in buffer_group_copy:
+                new_group, new_pval = find_fit_group(uid, dist_metrics, threshold)
+                if new_group is not None:
+                    buffer_group.remove(uid)
+                    if new_group in fit_group:
+                        fit_group[new_group].append(uid)
+                        fit_pvals[new_group].append(new_pval)
+                    else:
                         fit_group[new_group] = [uid]
                         fit_pvals[new_group] = [new_pval]
 
-         unfit_group_copy = {k:[i for i in v] for k, v in unfit_group.iteritems()}
-         for g, uids in unfit_group_copy.iteritems():
-             for uid in uids:
-                 new_group, new_pval = find_fit_group(uid, dist_metrics, threshold, g)
-                 unfit_group[g].remove(uid)
+        unfit_group_copy = {k:[i for i in v] for k, v in unfit_group.iteritems()}
+        for g, uids in unfit_group_copy.iteritems():
+            for uid in uids:
+                new_group, new_pval = find_fit_group(uid, dist_metrics, threshold, g)
+                unfit_group[g].remove(uid)
 
-                 if new_pval is None:
-                     buffer_group.append(uid)
-                 else:
-                     if new_group in fit_group:
-                          fit_group[new_group].append(uid)
-                          fit_pvals[new_group].append(new_pval)
-                     else:
-                         fit_group[new_group] = [uid]
-                         fit_pvals[new_group] = [new_pval]
+                if new_pval is None:
+                    buffer_group.append(uid)
+                else:
+                    if new_group in fit_group:
+                        fit_group[new_group].append(uid)
+                        fit_pvals[new_group].append(new_pval)
+                    else:
+                        fit_group[new_group] = [uid]
+                        fit_pvals[new_group] = [new_pval]
 
-         # step 04: calculate fit score
-         fs = get_fit_score(fit_pvals, buffer_group, c=c, t=1)
-         fs_hist.append(fs)
+        # step 04: calculate fit score
+        fs = get_fit_score(fit_pvals, buffer_group, c=c, t=1)
+        fs_hist.append(fs)
 
         # step 05: evaluate stop criteria
-         package = {"dist_metrics": dist_metrics,
-                    "fit_group": fit_group,
-                    "buffer_group": buffer_group}
+        package = {"dist_metrics": dist_metrics,
+                   "fit_group": fit_group,
+                   "buffer_group": buffer_group}
 
-         knowledge_pkg.append(package)
-         best_fs = min(fs_hist)
+        knowledge_pkg.append(package)
+        best_fs = min(fs_hist)
 
-         if best_fs - fs <= min_delta_f:
-             _no_imp_counter += _no_imp_counter
-         else:
-             _no_imp_counter = 0
-             if threshold > threshold_min:
-                 threshold -= 0.01
+        if best_fs - fs <= min_delta_f:
+            _no_imp_counter += _no_imp_counter
+        else:
+            _no_imp_counter = 0
+            if threshold > threshold_min:
+                threshold -= 0.01
 
-     # print "fit score (type-%d): %.3f" % (t, fs)
-     # print "best fit score: %.3f" % best_fs
-     best_idx = [i for i, fs in enumerate(fs_hist) if fs == best_fs]
-     best_knowledge = knowledge_pkg[best_idx]
-     return (best_knowledge, best_fs)
+    # print "fit score (type-%d): %.3f" % (t, fs)
+    # print "best fit score: %.3f" % best_fs
+    best_idx = [i for i, fs in enumerate(fs_hist) if fs == best_fs]
+    best_knowledge = knowledge_pkg[best_idx]
+    return (best_knowledge, best_fs)
