@@ -361,6 +361,10 @@ def find_fit_group(uid, dist_metrics, profile_df,
             best_group = None
             max_pval = None
 
+    else:
+        best_group = None
+        max_pval = None
+
     return (best_group, max_pval)
 
 def get_fit_score(fit_pvals, buffer_group, c):
@@ -466,7 +470,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
     # provide initial composition of fit_group  and buffer_group for iterative
     # learning procedure the even size sampling strategy is implemeted here,
     # however, benford's law can be used as alternative stratgey
-    al_ids = list(set(profile_df.ID))
+    all_uids = list(set(profile_df.ID))
     samp_size = len(all_uids) / k
     samp_sizes = [samp_size] * k
     all_uids_copy = [i for i in all_uids]
@@ -504,7 +508,9 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
             # here to update the computational mechanism
             # dist = [np.random.uniform(0, 1, 1)[0] for i in range(4)]
             if len(uids) >= min_size_group:
-                dist = ldm_train_with_list(uids, profile_df, friends_ls)
+                # ldm_train_with_list(users_list, profile_df, friends, retain_type=1)
+                dist = ldm_train_with_list(users_list=uids,
+                    profile_df=profile_df, friends=friends_pair)
                 dist_metrics[g] = dist
             else:
                 num_feat = profile_df.shape[1] - 1
@@ -552,7 +558,11 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
         buffer_group_copy = [i for i in buffer_group]
         if len(buffer_group_copy) > 0:
             for uid in buffer_group_copy:
-                new_group, new_pval = find_fit_group(uid, dist_metrics, threshold)
+                # find_fit_group(uid, dist_metrics, profile_df,
+                #                   friend_networkx, threshold=0.5,
+                #                   current_group=None, fit_rayleigh=False):
+                new_group, new_pval = find_fit_group(uid, dist_metrics,
+                    profile_df, friend_networkx, threshold, fit_rayleigh=fit_rayleigh)
                 if new_group is not None:
                     buffer_group.remove(uid)
                     if new_group in fit_group:
@@ -572,7 +582,8 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
         unfit_group_copy = {k:[i for i in v] for k, v in unfit_group.iteritems()}
         for g, uids in unfit_group_copy.iteritems():
             for uid in uids:
-                new_group, new_pval = find_fit_group(uid, dist_metrics, threshold, g)
+                new_group, new_pval = find_fit_group(uid, dist_metrics,
+                    profile_df, friend_networkx, threshold, g, fit_rayleigh)
                 unfit_group[g].remove(uid)
 
                 if new_pval is None:
