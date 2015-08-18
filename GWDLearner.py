@@ -23,6 +23,13 @@ from networkx import Graph
 from learning_dist_metrics.ldm import LDM
 from learning_dist_metrics.dist_metrics import weighted_euclidean
 
+from rpy2 import robjects
+from rpy2.robjects.packages import importr
+from rpy2.robjects.numpy2ri import numpy2ri
+
+robjects.conversion.py2ri = numpy2ri
+rstats = importr("stats")
+
 
 def user_grouped_dist(user_id, weights, profile_df, friend_networkx):
     """ Calculate distances between a user and whose friends
@@ -80,12 +87,35 @@ def user_grouped_dist(user_id, weights, profile_df, friend_networkx):
     return res
 
 
+def kstest_2samp_greater(x, y):
+    """ Calcualte the test statistics and Pvalue for
+        KS-test with two samples
+
+        Hypothesis:
+        H0: distr.(x) >= distr.(y) # not less than
+        H1: distr.(x) < distr.(y)
+
+        Pramaters:
+        ----------
+        x: {vector-like}
+        y: {vector-like}
+
+        Returns:
+        -------
+        cv, pval: {tuple}, test statistics, pvalue
+    """
+
+    greater = np.array(["less"], dtype="str")
+    res = rstats.ks_test(x, y, alternative=greater)
+    ts, pval = res[0][0], res[1][0]
+    return ts, pval
+
 def user_dist_kstest(sim_dist_vec, diff_dist_vec,
                      fit_rayleigh=False, _n=100):
 
     """ Test the goodness of a given weights to defferentiate friend distance
         distributions and non-friend distance distributions of a given user.
-        The distance distribution is considered to follow Rayleigh distribution.
+        The distance distribution can be assumed to follow Rayleigh distribution.
 
     Parameters:
     ----------
@@ -107,8 +137,13 @@ def user_dist_kstest(sim_dist_vec, diff_dist_vec,
     ---------
     pval = user_dist_kstest(sim_dist_vec, diff_dist_vec)
     """
-    # is_valid = (len(sim_dist_vec) >= min_nobs) & \
-    #           (len(diff_dist_vec) >= min_nobs) # not used yet
+    # convert list to numpy.arrray, which can be
+    # automatice transfer to R readable objects
+    # for R-function, if the proper setting is
+    # configured
+    sim_dist_vec = np.array(sim_dist_vec)
+    diff_dist_vec = np.array(diff_dist_vec)
+
     if fit_rayleigh:
         friend_param = rayleigh.fit(sim_dist_vec)
         nonfriend_param = rayleigh.fit(diff_dist_vec)
@@ -117,12 +152,11 @@ def user_dist_kstest(sim_dist_vec, diff_dist_vec,
         samp_nonfriend = rayleigh.rvs(nonfriend_param[0], nonfriend_param[1], _n)
 
         # ouput p-value of ks-test
-        res = ks_2samp(samp_friend, samp_nonfriend)[1]
+        res = kstest_2samp_greater(samp_friend, samp_nonfriend)[1]
     else:
-        res = ks_2samp(sim_dist_vec, diff_dist_vec)[1]
+        res = kstest_2samp_greater(sim_dist_vec, diff_dist_vec)[1]
 
     return res
-
 
 def users_filter_by_weights(weights, profile_df, friends_networkx,
                             pval_threshold=0.5,
@@ -178,9 +212,7 @@ def users_filter_by_weights(weights, profile_df, friends_networkx,
     -----
     min_friend_cnt is not implemented
     """
-    # all_users_ids = list(set(profile_df.ID))
-    # users_list
-    # container for users meeting different critiria
+
     pvals = []
     if users_list is None:
         users_list = list(profile_df.ix[:, 0])
@@ -193,13 +225,13 @@ def users_filter_by_weights(weights, profile_df, friends_networkx,
     sorted_id_pval = sorted(zip(users_list, pvals), key=lambda x: x[1])
 
     if is_debug:
-        good_fits = [i for i, p in sorted_id_pval if p < pval_threshold]
-        bad_fits = [i for i, p in sorted_id_pval if p >= pval_threshold]
-        good_pvals = [p for i, p in sorted_id_pval if p < pval_threshold]
-        bad_pvals = [p for i, p in sorted_id_pval if p >= pval_threshold]
+        good_fits = [i for i, p in sorted_id_pval if p >= pval_threshold]
+        bad_fits = [i for i, p in sorted_id_pval if p < pval_threshold]
+        good_pvals = [p for i, p in sorted_id_pval if p >= pval_threshold]
+        bad_pvals = [p for i, p in sorted_id_pval if p < pval_threshold]
     else:
-        good_fits = [i for i, p in sorted_id_pval if p < pval_threshold]
-        bad_fits = [i for i, p in sorted_id_pval if p >= pval_threshold]
+        good_fits = [i for i, p in sorted_id_pval if p >= pval_threshold]
+        bad_fits = [i for i, p in sorted_id_pval if p < pval_threshold]
 
     if len(bad_fits) > 0:
         mutate_size = np.ceil(len(bad_fits) * mutate_rate)
@@ -279,9 +311,9 @@ def init_dict_list(k):
         res_dict[i] = []
     return res_dict
 
-
 def find_fit_group(uid, dist_metrics, profile_df,
-                   friend_networkx, threshold=0.5,  current_group = None):
+                   friend_networkx, threshold=0.5,
+                   current_group=None, fit_rayleigh=False):
     """ calculate user p-value for the distance metrics of
         each group
 
@@ -293,6 +325,7 @@ def find_fit_group(uid, dist_metrics, profile_df,
     friend_networkx: {networkx.Graph}, user relationships
     threshold: {float}, threshold for qualifying pvalue of ks-test
     current_group: {integer}, group index
+    fit_rayleigh: {boolean}
 
     Resutls:
     --------
@@ -313,28 +346,24 @@ def find_fit_group(uid, dist_metrics, profile_df,
             # loop through all distance metrics and calculate
             # p-value of ks-test by applying it to the user
             # relationships
-            sdist, ddist = user_grouped_dist(uid, d, profile_df,
-                                         friend_networkx)
-            pval = user_dist_kstest(sdist, ddist, fit_rayleigh=True, _n=n)
+            sdist, ddist = user_grouped_dist(user_id=uid, weights=d,
+                        profile_df=profile_df, friend_networkx=friend_networkx)
+            pval = user_dist_kstest(sim_dist_vec=sdist, diff_dist_vec=ddist,
+                                fit_rayleigh=fit_rayleigh, _n=1000)
             pvals.append(pval)
 
-        min_pval = min(pvals)
-        min_index = [i for i, p in enumerate(pvals) if p == min_pval][0]
-        best_group = other_group[min_index]
+        max_pval = max(pvals)
+        max_index = [i for i, p in enumerate(pvals) if p == max_pval][0]
+        best_group = other_group[max_index]
 
-        if min_pval >= threshold:
-            # if min_pval >= threshold, user is not considered
-            # to have a good fit by any of distance metrics
+        if max_pval < threshold:
+            # reject null hypothesis
             best_group = None
-            min_pval = None
+            max_pval = None
 
-    else:
-        best_group = None
-        min_pval = None
+    return (best_group, max_pval)
 
-    return (best_group, min_pval)
-
-def get_fit_score(fit_pvals, buffer_group, c, t=2):
+def get_fit_score(fit_pvals, buffer_group, c):
     """ calculate the fit score given the member composite
         and its pvalues with its group distance metrics, with
         c determinng the strength of penalty for keeping a
@@ -362,41 +391,32 @@ def get_fit_score(fit_pvals, buffer_group, c, t=2):
     """
 
     # weighted sum of pvalues
-    if t not in [1, 2, 3]:
-        raise NameError('Error: type (t) is not legal value (1 or 2)!')
-
     wsum_pval = 0
-    if t == 1:
-        for g, v in fit_pvals.iteritems():
-            wsum_pval += sum(np.array(v) * 1.0 / len(v))
-    if t == 2:
-        for g, v in fit_pvals.iteritems():
-            wsum_pval += sum(np.array(v)) * 1.0 / (len(v) * len(v))
-    if t == 3:
-        num_users = 0
-        for g, v in fit_pvals.iteritems():
-            wsum_pval += sum(np.array(v)) * 1.0 / (len(v) * len(v))
-            num_users += len(v)
-        wsum_pval = num_users * 1.0 * wsum_pval
+    num_users = 0
+    for g, v in fit_pvals.iteritems():
+        wsum_pval += sum(np.array(v) * 1.0) * (len(v) * len(v))
+        num_users += len(v)
+    wsum_pval = wsum_pval * 1.0 / num_users
 
     penalty = c * len(buffer_group)
-    fit_score = wsum_pval + penalty # smaller value indicates a better overall fit
+    fit_score = wsum_pval - penalty # smaller value indicates a better overall fit
 
     return fit_score
 
 
-def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
-                     threshold_max=0.5, threshold_min=0.2,
+def learning_wrapper(profile_df, friends_pair, k, c=0.1,
+                     threshold_max=0.10, threshold_min=0.05,
                      min_size_group=10, min_delta_f=0.02,
-                     max_iter=5, n=1000):
+                     max_iter=5, fit_rayleigh=False,
+                     n=1000, verbose=False):
     """ learn the groupings and group-wise distance metrics
+
 
     Parameters:
     ----------
     profile_df: {pd.DataFrame}, with column ID and other attributes
     friends_pair: {list}, consisted of tuples of user id pairs
     k: {integer}, # of groups in the population
-    t: {integ}, type of fit score
     c: {float}, strength of penalty for larger size of buffer group
     threshold_max: {float}, from 0 to 1, the initial threshold for ks-test
     threshold_min: {float}, form 0 to 1, the mimum possible threhsold for ks-test
@@ -404,8 +424,11 @@ def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
     min_delta_f: {float}, minmal reduction considered substantial improvement
     max_iter: {integer}, maxmium number of sequential iterations with
         non-substantial improvement in fit score
+    fit_rayleigh: {boolean}, boolean fit rayleigh distribution to generate random
+        data to compare two distance distributions
     n: {integer}, the samples of Rayleigh distribution for ks-test,
         it influence the sensitivity of KS-test
+    verbose: {boolean}, display inprocess information
 
     Returns:
     -------
@@ -429,34 +452,33 @@ def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
     # fit_group: subsets of users
     # buffer_group: useres are not sampled
     dist_metrics = init_dict_list(k) # distance metrics containers
-    fit_group    = init_dict_list(k)    # members composition in fit groups
-    fit_pvals    = init_dict_list(k)    # members' pvalue of KStest with their group distance metrics
-    unfit_group  = init_dict_list(k)  # members is not considerd fit by its group distance metrics
-    unfit_pvals  = init_dict_list(k)  # pvalues for members in unfit_group (maybe can be deleted)
+    fit_group    = init_dict_list(k) # members composition in fit groups
+    fit_pvals    = init_dict_list(k) # members' pvalue of KStest with their group distance metrics
+    unfit_group  = init_dict_list(k) # members is not considerd fit by its group distance metrics
+    unfit_pvals  = init_dict_list(k) # pvalues for members in unfit_group (maybe can be deleted)
     buffer_group = []                # members are not considered having fit
 
     # results container
     fs_hist = []       # list of fit scores in sequence (lastest one is the last)
     knowledge_pkg = [] # {index: {"dist_metrics", "fit_group", "buffer_group"}}
-    threhold = threshold_max
+    threshold = threshold_max
 
-    # provide initial composition of fit_group
-    # and buffer_group for iterative learning
-    # procedure
-    # the even size sampling strategy is implemeted
-    # here, however,
-    # benford's law can be used as alternative stratgey
+    # provide initial composition of fit_group  and buffer_group for iterative
+    # learning procedure the even size sampling strategy is implemeted here,
+    # however, benford's law can be used as alternative stratgey
     al_ids = list(set(profile_df.ID))
     samp_size = len(all_uids) / k
     samp_sizes = [samp_size] * k
     all_uids_copy = [i for i in all_uids]
+
+    print "Initiating ..."
 
     # generate k groups of sample user groups
     for g, samp_size in zip(range(k), samp_sizes):
         # draw samples and assign them to fit_group
         samples = choice(all_uids_copy, samp_size, replace=False)
         fit_group[g] = list(samples)
-        # remove samples from population pool
+        # remove sampled users from population pool
         for uid in samples:
             all_uids_copy.remove(uid)
 
@@ -486,7 +508,7 @@ def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
                 dist_metrics[g] = dist
             else:
                 num_feat = profile_df.shape[1] - 1
-                ist_metrics[g] = [1] * num_feat
+                dist_metrics[g] = [1] * num_feat
 
         # step 02: update the member composite with updated group
         # distance metrics threshold is needed to be defined
@@ -496,12 +518,13 @@ def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
 
             for uid in uids:
                 sdist, ddist = user_grouped_dist(uid, dist_metrics, profile_df,
-                                          friends_networkx)
-                pval = user_dist_kstest(sdist, ddist, fit_rayleigh=True, _n=n)
+                                          friend_networkx)
+                pval = user_dist_kstest(sdist, ddist, fit_rayleigh=fit_rayleigh, _n=n)
 
-                if pval >= threshold:
-                    # remove the user and its information
-                    # from relevant container
+                if pval < threshold:
+                    # H0 does not hold, user should be re-assign to differnt
+                    # group. remove from the current group and keep in the
+                    # unfit group
                     idx = [i for i, u in enumerate(fit_group[g]) if u == uid][0]
                     fit_group[g].pop(idx)
                     fit_pvals[g].pop(idx)
@@ -511,14 +534,20 @@ def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
                         unfit_group[g].append(uid)
                     else:
                         unfit_group[g] = [uid]
-
                 else:
+                    # H0 hold, update the pval
                     idx = [i for i, u in enumerate(fit_group[g]) if u == uid][0]
                     fit_pvals[g][idx] = pval
 
+        if verbose:
+            tot_fit_group = np.sum([len(u) for g, u in fit_group.iteritems()])
+            tot_unfit_group = np.sum([len(u) for g, u in unfit_group.iteritems()])
+            tot_buffer_group = len(buffer_group)
+            print "1) #fit: %d, #unfit: %d, #buffer: %d" % (tot_fit_group,
+            tot_unfit_group, tot_buffer_group)
 
         # step 03: test members in unfit_group to see
-        # if it has a good fit with other distmetrics
+        # if it has a good fit with other dist metrics
         # make a copy of the buffer group container
         buffer_group_copy = [i for i in buffer_group]
         if len(buffer_group_copy) > 0:
@@ -532,6 +561,13 @@ def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
                     else:
                         fit_group[new_group] = [uid]
                         fit_pvals[new_group] = [new_pval]
+
+        if verbose:
+            tot_fit_group = np.sum([len(u) for g, u in fit_group.iteritems()])
+            tot_unfit_group = np.sum([len(u) for g, u in unfit_group.iteritems()])
+            tot_buffer_group = len(buffer_group)
+            print "1) #fit: %d, #unfit: %d, #buffer: %d" % (tot_fit_group,
+            tot_unfit_group, tot_buffer_group)
 
         unfit_group_copy = {k:[i for i in v] for k, v in unfit_group.iteritems()}
         for g, uids in unfit_group_copy.iteritems():
@@ -549,8 +585,15 @@ def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
                         fit_group[new_group] = [uid]
                         fit_pvals[new_group] = [new_pval]
 
+        if verbose:
+            tot_fit_group = np.sum([len(u) for g, u in fit_group.iteritems()])
+            tot_unfit_group = np.sum([len(u) for g, u in unfit_group.iteritems()])
+            tot_buffer_group = len(buffer_group)
+            print "1) #fit: %d, #unfit: %d, #buffer: %d" % (tot_fit_group,
+            tot_unfit_group, tot_buffer_group)
+
         # step 04: calculate fit score
-        fs = get_fit_score(fit_pvals, buffer_group, c=c, t=1)
+        fs = get_fit_score(fit_pvals, buffer_group, c=c)
         fs_hist.append(fs)
 
         # step 05: evaluate stop criteria
@@ -562,11 +605,12 @@ def learning_wrapper(profile_df, friends_pair, k, t=2, c=0.1,
         best_fs = min(fs_hist)
 
         if best_fs - fs <= min_delta_f:
-            _no_imp_counter += _no_imp_counter
+            _no_imp_counter += 1
         else:
             _no_imp_counter = 0
             if threshold > threshold_min:
-                threshold -= 0.01
+                threshold -= 0.001
+                threshold = max(threshold_min, threshold)
 
     # print "fit score (type-%d): %.3f" % (t, fs)
     # print "best fit score: %.3f" % best_fs

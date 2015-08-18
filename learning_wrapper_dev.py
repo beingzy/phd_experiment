@@ -9,6 +9,7 @@ the entire data set and tried to learn the weighting vector
 @dev_date: 05/24/2015
 @description:
 develop the iterative process following the initial learning:
+
 [swaping learning]
 a. pre-create two learning container to reprsent two
    separate groups
@@ -19,11 +20,9 @@ b. applying learned learning metrics to evaluate the
    opposite group.
 c. repeat the process until the a criteria had been met
 
-
-
 @author: beingzy
 @create: 05/18/2015
-@update: 05/19/2015
+@update: 08/15/2015
 """
 
 import os
@@ -395,4 +394,3 @@ ldm_g1.fit(users_df[cols], friends_g1.pair.as_matrix())
 ## strategy 02 results:
 ## g0: [0.51, 0.32, 0.06, 0.08, 0.0, 0.02]
 ## g1: [0.4, 0.59, 0.0, 0.0, 0.0, 0.0]
-
