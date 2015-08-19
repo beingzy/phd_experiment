@@ -407,11 +407,44 @@ def get_fit_score(fit_pvals, buffer_group, c):
 
     return fit_score
 
+def drawDropouts(users, pvals, dropout=0.1, desc=False):
+    """ select a defined number of users from users
+        list, based on dropout rate.
+
+    Parameters:
+    -----------
+    * users, list
+    * pvals, list
+    * dropout, float, dropout rate
+    * desc, boolean, True for sorting in descending order
+
+    Returns:
+    -------
+    res: tuple, (users, pvals, user_dropout)
+    """
+
+    sort_idx = sorted(range(len(pvals)), key=lambda k:pvals[k],
+                      reverse=desc)
+    # calculate number of users for dropout
+    ndropout = int(np.ceil(len(users) * dropout))
+
+    if ndropout < len(users):
+        if len(users) >= 2:
+            user_dropout = []
+            remove_idx = sort_idx[:ndropout]
+            for ridx in remove_idx:
+                del pvals[ridx]
+                u = users.pop(ridx)
+                user_dropout = user_dropout + [u]
+
+    return (users, pvals, user_dropout)
+
 
 def learning_wrapper(profile_df, friends_pair, k, c=0.1,
                      threshold_max=0.10, threshold_min=0.05,
                      min_size_group=10, min_delta_f=0.02,
-                     max_iter=5, fit_rayleigh=False,
+                     dropout=0.2,
+                     max_iter=50, cum_iter=300, fit_rayleigh=False,
                      n=1000, verbose=False):
     """ learn the groupings and group-wise distance metrics
 
@@ -428,6 +461,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
     min_delta_f: {float}, minmal reduction considered substantial improvement
     max_iter: {integer}, maxmium number of sequential iterations with
         non-substantial improvement in fit score
+    cum_iter: {integer}, overall maximum learning iteration
     fit_rayleigh: {boolean}, boolean fit rayleigh distribution to generate random
         data to compare two distance distributions
     n: {integer}, the samples of Rayleigh distribution for ks-test,
@@ -558,9 +592,6 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
         buffer_group_copy = [i for i in buffer_group]
         if len(buffer_group_copy) > 0:
             for uid in buffer_group_copy:
-                # find_fit_group(uid, dist_metrics, profile_df,
-                #                   friend_networkx, threshold=0.5,
-                #                   current_group=None, fit_rayleigh=False):
                 new_group, new_pval = find_fit_group(uid, dist_metrics,
                     profile_df, friend_networkx, threshold, fit_rayleigh=fit_rayleigh)
                 if new_group is not None:
@@ -610,6 +641,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
         # step 05: evaluate stop criteria
         package = {"dist_metrics": dist_metrics,
                    "fit_group": fit_group,
+                   "fit_pvals": fit_pvals,
                    "buffer_group": buffer_group}
 
         knowledge_pkg.append(package)
@@ -619,12 +651,32 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
             _no_imp_counter += 1
         else:
             _no_imp_counter = 0
-            if threshold > threshold_min:
-                threshold -= 0.001
-                threshold = max(threshold_min, threshold)
+            # if threshold > threshold_min:
+            #    threshold -= 0.001
+            #    threshold = max(threshold_min, threshold)
+            dropouts = {}
+            # draw users for dropouts
+            for g, uids in fit_group.iteritems():
+                pvals = fit_pvals[g]
+                new_uids, new_pvals, dropout_users = drawDropouts(uids,
+                    pvals, dropout, desc=False)
+                fit_group[g] = new_uids
+                fit_pvals[g] = new_pvals
+                dropouts[g] = dropout_users
+
+            # randomly reassign users to other group
+            for g, uids in dropouts[g]:
+                groups = dropouts.keys()
+                groups.remove(g)
+                tg = np.choice(groups, 1)
+                fit_group[tg] = np.append(fit_group[tg], uids)
 
     # print "fit score (type-%d): %.3f" % (t, fs)
     # print "best fit score: %.3f" % best_fs
     best_idx = [i for i, fs in enumerate(fs_hist) if fs == best_fs]
-    best_knowledge = knowledge_pkg[best_idx]
-    return (best_knowledge, best_fs)
+    best_knowledge = knowledge_pkg[best_idx[0]]
+
+    if verbose:
+        return (best_knowledge, best_fs, knowledge_pkg)
+    else:
+        return (best_knowledge, best_fs)
