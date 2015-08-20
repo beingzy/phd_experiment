@@ -606,13 +606,13 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
                     profile_df, friend_networkx, threshold, fit_rayleigh=fit_rayleigh)
                 if new_group is not None:
                     buffer_group.remove(uid)
-                    gix = [i for i in fit_group.keys() if i==fit_group]
+                    #gix = [i for i in fit_group.keys() if i==fit_group]
                     if new_group in fit_group:
-                        fit_group[gix].append(uid)
-                        fit_pvals[gix].append(new_pval)
+                        fit_group[new_group].append(uid)
+                        fit_pvals[new_group].append(new_pval)
                     else:
-                        fit_group[gix] = [uid]
-                        fit_pvals[gix] = [new_pval]
+                        fit_group[new_group] = [uid]
+                        fit_pvals[new_group] = [new_pval]
 
         if verbose:
             tot_fit_group = np.sum([len(u) for g, u in fit_group.iteritems()])
