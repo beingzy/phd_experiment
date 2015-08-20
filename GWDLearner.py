@@ -423,27 +423,37 @@ def drawDropouts(users, pvals, dropout=0.1, desc=False):
     res: tuple, (users, pvals, user_dropout)
     """
 
-    sort_idx = sorted(range(len(pvals)), key=lambda k:pvals[k],
+    users_copy = [i for i in users]
+    pvals_copy = [i for i in pvals]
+    sort_idx = sorted(range(len(users_copy)), \
+                      key=lambda k:pvals_copy[k],\
                       reverse=desc)
     # calculate number of users for dropout
-    ndropout = int(np.ceil(len(users) * dropout))
+    ndropout = int(np.ceil(len(users_copy) * dropout))
 
-    if ndropout < len(users):
-        if len(users) >= 2:
+    if len(users_copy) > ndropout:
+        if len(users_copy) >= 2:
             user_dropout = []
+            pval_dropout = []
             remove_idx = sort_idx[:ndropout]
             for ridx in remove_idx:
-                del pvals[ridx]
-                u = users.pop(ridx)
-                user_dropout = user_dropout + [u]
+                u = users_copy[ridx]
+                p = pvals_copy[ridx]
+                user_dropout.append(u)
+                pval_dropout.append(p)
+            # eleminate values for removed items
+            users_copy = [v for i, v in enumerate(users_copy) \
+                          if i not in remove_idx]
+            pvals_copy = [v for i, v in enumerate(pvals_copy) \
+                          if i not in remove_idx]
 
-    return (users, pvals, user_dropout)
+    return (users, pvals, user_dropout, pval_dropout)
 
 
 def learning_wrapper(profile_df, friends_pair, k, c=0.1,
                      threshold_max=0.10, threshold_min=0.05,
                      min_size_group=10, min_delta_f=0.02,
-                     dropout=0.2,
+                     dropout_rate=0.2,
                      max_iter=50, cum_iter=300, fit_rayleigh=False,
                      n=1000, verbose=False):
     """ learn the groupings and group-wise distance metrics
@@ -568,12 +578,12 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
                     idx = [i for i, u in enumerate(fit_group[g]) if u == uid][0]
                     fit_group[g].pop(idx)
                     fit_pvals[g].pop(idx)
-
                      # add the user to the unfit_group
                     if g in unfit_group:
                         unfit_group[g].append(uid)
                     else:
                         unfit_group[g] = [uid]
+
                 else:
                     # H0 hold, update the pval
                     idx = [i for i, u in enumerate(fit_group[g]) if u == uid][0]
@@ -596,12 +606,13 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
                     profile_df, friend_networkx, threshold, fit_rayleigh=fit_rayleigh)
                 if new_group is not None:
                     buffer_group.remove(uid)
+                    gix = [i for i in fit_group.keys() if i==fit_group]
                     if new_group in fit_group:
-                        fit_group[new_group].append(uid)
-                        fit_pvals[new_group].append(new_pval)
+                        fit_group[gix].append(uid)
+                        fit_pvals[gix].append(new_pval)
                     else:
-                        fit_group[new_group] = [uid]
-                        fit_pvals[new_group] = [new_pval]
+                        fit_group[gix] = [uid]
+                        fit_pvals[gix] = [new_pval]
 
         if verbose:
             tot_fit_group = np.sum([len(u) for g, u in fit_group.iteritems()])
@@ -620,6 +631,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
                 if new_pval is None:
                     buffer_group.append(uid)
                 else:
+                    gix = [i for i in fit_group.keys() if i==fit_group]
                     if new_group in fit_group:
                         fit_group[new_group].append(uid)
                         fit_pvals[new_group].append(new_pval)
@@ -632,7 +644,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
             tot_unfit_group = np.sum([len(u) for g, u in unfit_group.iteritems()])
             tot_buffer_group = len(buffer_group)
             print "1) #fit: %d, #unfit: %d, #buffer: %d" % (tot_fit_group,
-            tot_unfit_group, tot_buffer_group)
+                tot_unfit_group, tot_buffer_group)
 
         # step 04: calculate fit score
         fs = get_fit_score(fit_pvals, buffer_group, c=c)
@@ -641,11 +653,10 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
         # step 05: evaluate stop criteria
         package = {"dist_metrics": dist_metrics,
                    "fit_group": fit_group,
-                   "fit_pvals": fit_pvals,
                    "buffer_group": buffer_group}
 
         knowledge_pkg.append(package)
-        best_fs = min(fs_hist)
+        best_fs = max(fs_hist)
 
         if best_fs - fs <= min_delta_f:
             _no_imp_counter += 1
@@ -654,22 +665,33 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
             # if threshold > threshold_min:
             #    threshold -= 0.001
             #    threshold = max(threshold_min, threshold)
-            dropouts = {}
+            user_dropout_dict = {}
+            pval_dropout_dict = {}
             # draw users for dropouts
+            print "** dropout is activating ...\n"
             for g, uids in fit_group.iteritems():
-                pvals = fit_pvals[g]
-                new_uids, new_pvals, dropout_users = drawDropouts(uids,
-                    pvals, dropout, desc=False)
-                fit_group[g] = new_uids
-                fit_pvals[g] = new_pvals
-                dropouts[g] = dropout_users
+                try:
+                    pvals = fit_pvals[g]
+                    new_uids, new_pvals, dropout_users, dropout_pvals = \
+                        drawDropouts(uids, pvals, dropout_rate, desc=False)
+                    fit_group[g] = list(new_uids)
+                    fit_pvals[g] = list(new_pvals)
+                    user_dropout_dict[g] = dropout_users
+                    pval_dropout_dict[g] = dropout_pvals
+
+                except:
+                    print 'error pop up for dropouting! \n'
 
             # randomly reassign users to other group
-            for g, uids in dropouts[g]:
-                groups = dropouts.keys()
-                groups.remove(g)
-                tg = np.choice(groups, 1)
-                fit_group[tg] = np.append(fit_group[tg], uids)
+            if len(dropouts) > 0:
+                for g, uids in user_dropout_dict.iteritems():
+                    groups = fit_group.keys()
+                    if len(groups) > 1:
+                        groups.remove(g)
+                        tg = choice(groups, 1)[0]
+                        pvals = pval_dropout_dict[tg]
+                        fit_group[tg].extend(uids)
+                        fit_pvals[tg].extend(pvals)
 
     # print "fit score (type-%d): %.3f" % (t, fs)
     # print "best fit score: %.3f" % best_fs
