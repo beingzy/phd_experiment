@@ -458,6 +458,13 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
                      n=1000, verbose=False):
     """ learn the groupings and group-wise distance metrics
 
+        1. "treshold" is fixed by treshold_max, the larger value will lead
+        to more aggressive learning to make more member qualifying for
+        group change. It should be considered an avenuae to gradaully
+        reduce threshold for KS-test to mange the learning rate.
+        2. The "dropout_rate" should be considered to vary over
+        iteration as well. A decreasing dropout_rate promotes the converage
+        of learning.
 
     Parameters:
     ----------
@@ -683,13 +690,13 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
                     print 'error pop up for dropouting! \n'
 
             # randomly reassign users to other group
-            if len(dropouts) > 0:
+            if len(user_dropout_dict) > 0:
                 for g, uids in user_dropout_dict.iteritems():
+                    pvals  = pval_dropout_dict[g]
                     groups = fit_group.keys()
                     if len(groups) > 1:
                         groups.remove(g)
                         tg = choice(groups, 1)[0]
-                        pvals = pval_dropout_dict[tg]
                         fit_group[tg].extend(uids)
                         fit_pvals[tg].extend(pvals)
 
