@@ -452,7 +452,7 @@ def drawDropouts(users, pvals, dropout=0.1, desc=False):
 
 def learning_wrapper(profile_df, friends_pair, k, c=0.1,
                      threshold_max=0.10, threshold_min=0.05,
-                     min_size_group=10, min_delta_f=0.02,
+                     min_size_group=10, min_delta_f=5,
                      dropout_rate=0.2,
                      max_iter=50, cum_iter=300, fit_rayleigh=False,
                      n=1000, verbose=False):
@@ -654,6 +654,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
                 tot_unfit_group, tot_buffer_group)
 
         # step 04: calculate fit score
+        prev_fs_best = max(fs_hist)
         fs = get_fit_score(fit_pvals, buffer_group, c=c)
         fs_hist.append(fs)
 
@@ -665,10 +666,12 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
         knowledge_pkg.append(package)
         best_fs = max(fs_hist)
 
-        if best_fs - fs <= min_delta_f:
-            _no_imp_counter += 1
-        else:
+        if fs - prev_fs_best >= min_delta_f:
+            # effective learning keep the momentum
             _no_imp_counter = 0
+        else:
+            # non-substantial improvement
+            _no_imp_counter += 1
             # if threshold > threshold_min:
             #    threshold -= 0.001
             #    threshold = max(threshold_min, threshold)
