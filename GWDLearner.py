@@ -447,7 +447,7 @@ def drawDropouts(users, pvals, dropout=0.1, desc=False):
             pvals_copy = [v for i, v in enumerate(pvals_copy) \
                           if i not in remove_idx]
 
-    return (users, pvals, user_dropout, pval_dropout)
+    return (users_copy, pvals_copy, user_dropout, pval_dropout)
 
 
 def learning_wrapper(profile_df, friends_pair, k, c=0.1,
