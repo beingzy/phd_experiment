@@ -548,7 +548,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
     _no_imp_counter = 0
     _loop_counter = 0
 
-    while _no_imp_counter < max_iter:
+    while _no_imp_counter < max_iter and _loop_counter <= cum_iter:
 
         _loop_counter += 1
         print "%d iteration is in processing ..." % _loop_counter
@@ -569,8 +569,14 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
                     print "%s" % dist
 
             else:
-                num_feat = profile_df.shape[1] - 1
-                dist_metrics[g] = [1] * num_feat
+                try:
+                    # do not update distance metrics
+                    # if it was learned prior
+                    dist_metrics[g] = dist_metrics[g]
+                except:
+                    # initiate the group distance metrics
+                    num_feat = profile_df.shape[1] - 1
+                    dist_metrics[g] = [1] * num_feat
 
         # step 02: update the member composite with updated group
         # distance metrics threshold is needed to be defined
@@ -579,7 +585,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
             target_dist = dist_metrics[g]
 
             for uid in uids:
-                sdist, ddist = user_grouped_dist(uid, dist_metrics, profile_df,
+                sdist, ddist = user_grouped_dist(uid, target_dist, profile_df,
                                           friend_networkx)
                 pval = user_dist_kstest(sdist, ddist, fit_rayleigh=fit_rayleigh, _n=n)
 
@@ -606,7 +612,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
             tot_unfit_group = np.sum([len(u) for g, u in unfit_group.iteritems()])
             tot_buffer_group = len(buffer_group)
             print "1) #fit: %d, #unfit: %d, #buffer: %d" % (tot_fit_group,
-            tot_unfit_group, tot_buffer_group)
+                tot_unfit_group, tot_buffer_group)
 
         # step 03: test members in unfit_group to see
         # if it has a good fit with other dist metrics
