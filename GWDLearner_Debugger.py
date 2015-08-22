@@ -1,22 +1,7 @@
 import os
-import sys
-import glob
-import numpy as np
-import scipy as sp
 import pandas as pd
-import networkx as nx
-from matplotlib import pyplot as plt
+from GWDLearner import *
 
-from scipy.stats import rayleigh
-from scipy.stats import ks_2samp
-from numpy import linspace
-from numpy.random import choice
-from networkx import Graph
-
-from learning_dist_metrics.ldm import LDM
-from learning_dist_metrics.dist_metrics import weighted_euclidean
-
-import matplotlib.pyplot as plt
 
 DATA_PATH = "./data/sim_data_yi/"
 
@@ -38,13 +23,13 @@ all_user_ids = list(set(users_df.ID))
 
 ## ###################################################
 ## start learning
-from GWDLearner import *
-
 profile_df = profile_df      # user profile
 friends_ls = friends_df.pair # user relationship
 
 res = learning_wrapper(profile_df=profile_df, friends_pair=friends_ls,
-                       k=2, c=0.1, dropout_rate=0.2, fit_rayleigh=True, verbose=True)
+                       k=2, c=0.1, dropout_rate=0.2,
+                       fit_rayleigh=True,
+                       verbose=True)
 
 ## #################################
 ## Export results

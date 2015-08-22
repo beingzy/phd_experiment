@@ -563,6 +563,11 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
                 dist = ldm_train_with_list(users_list=uids,
                     profile_df=profile_df, friends=friends_pair)
                 dist_metrics[g] = dist
+
+                if verbose:
+                    print "Group %d:'s distance metrics: \n"
+                    print "%s" % dist
+
             else:
                 num_feat = profile_df.shape[1] - 1
                 dist_metrics[g] = [1] * num_feat
