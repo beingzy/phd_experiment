@@ -44,4 +44,21 @@ profile_df = profile_df      # user profile
 friends_ls = friends_df.pair # user relationship
 
 res = learning_wrapper(profile_df=profile_df, friends_pair=friends_ls,
-                       k=2, c=0.1, dropout=0.2, fit_rayleigh=True, verbose=True)
+                       k=2, c=0.1, dropout_rate=0.2, fit_rayleigh=True, verbose=True)
+
+## #################################
+## Export results
+import json
+
+root_path = os.getcwd()
+data_path = root_path + "/results/"
+
+# extract component of interest
+_, _, info_pkg = res
+
+# create output connection
+outfile = data_path + "beta_test_20150822_v01.json"
+out_conn = open(outfile, 'w')
+print "Writing out information..."
+out_conn.write( json.dumps(info_pkg) )
+out_conn.close()
