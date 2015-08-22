@@ -654,8 +654,11 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
                 tot_unfit_group, tot_buffer_group)
 
         # step 04: calculate fit score
-        prev_fs_best = max(fs_hist)
         fs = get_fit_score(fit_pvals, buffer_group, c=c)
+        try:
+            prev_fs_best = max(fs_hist)
+        except:
+            prev_fs_best = 0
         fs_hist.append(fs)
 
         # step 05: evaluate stop criteria
@@ -664,7 +667,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
                    "buffer_group": buffer_group}
 
         knowledge_pkg.append(package)
-        best_fs = max(fs_hist)
+        #best_fs = max(fs_hist)
 
         if fs - prev_fs_best >= min_delta_f:
             # effective learning keep the momentum
@@ -672,12 +675,8 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
         else:
             # non-substantial improvement
             _no_imp_counter += 1
-            # if threshold > threshold_min:
-            #    threshold -= 0.001
-            #    threshold = max(threshold_min, threshold)
             user_dropout_dict = {}
             pval_dropout_dict = {}
-            # draw users for dropouts
             print "** dropout is activating ...\n"
             for g, uids in fit_group.iteritems():
                 try:
@@ -705,6 +704,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
 
     # print "fit score (type-%d): %.3f" % (t, fs)
     # print "best fit score: %.3f" % best_fs
+    best_fs = max(fs_hist)
     best_idx = [i for i, fs in enumerate(fs_hist) if fs == best_fs]
     best_knowledge = knowledge_pkg[best_idx[0]]
 
