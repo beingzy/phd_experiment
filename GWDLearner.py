@@ -161,7 +161,6 @@ def user_dist_kstest(sim_dist_vec, diff_dist_vec,
 def users_filter_by_weights(weights, profile_df, friends_networkx,
                             pval_threshold=0.5,
                             mutate_rate=0.4,
-                            min_friend_cnt=10,
                             users_list=None,
                             fit_rayleigh=False,
                             _n=1000,
@@ -506,7 +505,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
     # dist_metrics: ldm() with subset of users
     # fit_group: subsets of users
     # buffer_group: useres are not sampled
-    dist_metrics = init_dict_list(k) # distance metrics containers
+    # dist_metrics = init_dict_list(k) # distance metrics containers
     fit_group    = init_dict_list(k) # members composition in fit groups
     fit_pvals    = init_dict_list(k) # members' pvalue of KStest with their group distance metrics
     unfit_group  = init_dict_list(k) # members is not considerd fit by its group distance metrics
@@ -548,12 +547,13 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
     _no_imp_counter = 0
     _loop_counter = 0
 
-    while _no_imp_counter < max_iter and _loop_counter <= cum_iter:
+    while _no_imp_counter < max_iter:
 
         _loop_counter += 1
         print "%d iteration is in processing ..." % _loop_counter
 
         # step 01: learn distance metrics
+        dist_metrics = init_dict_list(k) # distance metrics containers
         for g, uids in fit_group.iteritems():
             # learn distance metrics
             # here to update the computational mechanism
@@ -563,20 +563,9 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
                 dist = ldm_train_with_list(users_list=uids,
                     profile_df=profile_df, friends=friends_pair)
                 dist_metrics[g] = dist
-
-                if verbose:
-                    print "Group %d:'s distance metrics: \n"
-                    print "%s" % dist
-
             else:
-                try:
-                    # do not update distance metrics
-                    # if it was learned prior
-                    dist_metrics[g] = dist_metrics[g]
-                except:
-                    # initiate the group distance metrics
-                    num_feat = profile_df.shape[1] - 1
-                    dist_metrics[g] = [1] * num_feat
+                num_feat = profile_df.shape[1] - 1
+                dist_metrics[g] = [1] * num_feat
 
         # step 02: update the member composite with updated group
         # distance metrics threshold is needed to be defined
@@ -585,7 +574,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
             target_dist = dist_metrics[g]
 
             for uid in uids:
-                sdist, ddist = user_grouped_dist(uid, target_dist, profile_df,
+                sdist, ddist = user_grouped_dist(uid, dist_metrics, profile_df,
                                           friend_networkx)
                 pval = user_dist_kstest(sdist, ddist, fit_rayleigh=fit_rayleigh, _n=n)
 
@@ -675,7 +664,8 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
         # step 05: evaluate stop criteria
         package = {"dist_metrics": dist_metrics,
                    "fit_group": fit_group,
-                   "buffer_group": buffer_group}
+                   "buffer_group": buffer_group,
+                   "fit_hist": fit_hist}
 
         knowledge_pkg.append(package)
         #best_fs = max(fs_hist)
