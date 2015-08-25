@@ -547,7 +547,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
     _no_imp_counter = 0
     _loop_counter = 0
 
-    while _no_imp_counter < max_iter:
+    while _no_imp_counter < max_iter & _loop_counter < cum_iter:
 
         _loop_counter += 1
         print "%d iteration is in processing ..." % _loop_counter
@@ -574,7 +574,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
             target_dist = dist_metrics[g]
 
             for uid in uids:
-                sdist, ddist = user_grouped_dist(uid, dist_metrics, profile_df,
+                sdist, ddist = user_grouped_dist(uid, target_dist, profile_df,
                                           friend_networkx)
                 pval = user_dist_kstest(sdist, ddist, fit_rayleigh=fit_rayleigh, _n=n)
 
@@ -613,13 +613,13 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
                     profile_df, friend_networkx, threshold, fit_rayleigh=fit_rayleigh)
                 if new_group is not None:
                     buffer_group.remove(uid)
-                    #gix = [i for i in fit_group.keys() if i==fit_group]
+                    gix = [i for i in fit_group.keys() if i==new_group]
                     if new_group in fit_group:
-                        fit_group[new_group].append(uid)
-                        fit_pvals[new_group].append(new_pval)
+                        fit_group[gix].append(uid)
+                        fit_pvals[gix].append(new_pval)
                     else:
-                        fit_group[new_group] = [uid]
-                        fit_pvals[new_group] = [new_pval]
+                        fit_group[gix] = [uid]
+                        fit_pvals[gix] = [new_pval]
 
         if verbose:
             tot_fit_group = np.sum([len(u) for g, u in fit_group.iteritems()])
@@ -638,13 +638,13 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
                 if new_pval is None:
                     buffer_group.append(uid)
                 else:
-                    gix = [i for i in fit_group.keys() if i==fit_group]
+                    gix = [i for i in fit_group.keys() if i==new_group]
                     if new_group in fit_group:
-                        fit_group[new_group].append(uid)
-                        fit_pvals[new_group].append(new_pval)
+                        fit_group[gix].append(uid)
+                        fit_pvals[gix].append(new_pval)
                     else:
-                        fit_group[new_group] = [uid]
-                        fit_pvals[new_group] = [new_pval]
+                        fit_group[gix] = [uid]
+                        fit_pvals[gix] = [new_pval]
 
         if verbose:
             tot_fit_group = np.sum([len(u) for g, u in fit_group.iteritems()])
@@ -665,7 +665,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
         package = {"dist_metrics": dist_metrics,
                    "fit_group": fit_group,
                    "buffer_group": buffer_group,
-                   "fit_hist": fit_hist}
+                   "fs_hist": fs_hist}
 
         knowledge_pkg.append(package)
         #best_fs = max(fs_hist)
