@@ -3,9 +3,7 @@
   <component name="ChangeListManager">
     <list default="true" id="a49a2c9b-ae7a-4ea9-b206-5c4754d56048" name="Default" comment="">
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/GWDLearner.py" afterPath="$PROJECT_DIR$/GWDLearner.py" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/GWDLearner_Debugger.py" afterPath="$PROJECT_DIR$/GWDLearner_Debugger.py" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/late_phase_test_GWDLearner_raiyleigh.ipynb" afterPath="$PROJECT_DIR$/late_phase_test_GWDLearner_raiyleigh.ipynb" />
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
     </list>
     <ignored path="phd_experiment.iws" />
     <ignored path=".idea/workspace.xml" />
@@ -29,8 +27,8 @@
       <file leaf-file-name="GWDLearner.py" pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/GWDLearner.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state vertical-scroll-proportion="-0.21372329">
-              <caret line="646" column="43" selection-start-line="646" selection-start-column="43" selection-end-line="646" selection-end-column="43" />
+            <state vertical-scroll-proportion="0.16985376">
+              <caret line="452" column="41" selection-start-line="452" selection-start-column="41" selection-end-line="452" selection-end-column="41" />
               <folding>
                 <element signature="e#0#18#0" expanded="true" />
               </folding>
@@ -447,8 +445,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/GWDLearner.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state vertical-scroll-proportion="-0.21372329">
-          <caret line="646" column="43" selection-start-line="646" selection-start-column="43" selection-end-line="646" selection-end-column="43" />
+        <state vertical-scroll-proportion="0.16985376">
+          <caret line="452" column="41" selection-start-line="452" selection-start-column="41" selection-end-line="452" selection-end-column="41" />
           <folding>
             <element signature="e#0#18#0" expanded="true" />
           </folding>

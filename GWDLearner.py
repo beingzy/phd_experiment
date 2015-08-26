@@ -450,11 +450,14 @@ def drawDropouts(users, pvals, dropout=0.1, desc=False):
 
 
 def learning_wrapper(profile_df, friends_pair, k, c=0.1,
-                     threshold_max=0.10, threshold_min=0.05,
-                     min_size_group=10, min_delta_f=5,
+                     threshold_max=0.10, 
+                     min_size_group=10,
+                     min_delta_f=5,
                      dropout_rate=0.2,
-                     max_iter=50, cum_iter=300, fit_rayleigh=False,
-                     n=1000, verbose=False):
+                     max_iter=50,
+                     fit_rayleigh=False,
+                     n=1000,
+                     verbose=False):
     """ learn the groupings and group-wise distance metrics
 
         1. "treshold" is fixed by treshold_max, the larger value will lead
@@ -547,7 +550,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
     _no_imp_counter = 0
     _loop_counter = 0
 
-    while _no_imp_counter < max_iter & _loop_counter < cum_iter:
+    while _no_imp_counter < max_iter:
 
         _loop_counter += 1
         print "%d iteration is in processing ..." % _loop_counter
