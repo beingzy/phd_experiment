@@ -26,11 +26,8 @@ all_user_ids = list(set(users_df.ID))
 profile_df = profile_df      # user profile
 friends_ls = friends_df.pair # user relationship
 
-res = learning_wrapper(profile_df=profile_df, friends_pair=friends_ls,
-                       k=2, c=0.1, dropout_rate=0.2,
-                       fit_rayleigh=True,
-                       verbose=True)
-
+res = learning_wrapper(profile_df=profile_df, friends_pair=friends_ls, max_iter=5,
+                       k=2, c=0.1, dropout_rate=0.2, fit_rayleigh=True, verbose=True)
 ## #################################
 ## Export results
 import json
