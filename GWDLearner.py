@@ -450,14 +450,15 @@ def drawDropouts(users, pvals, dropout=0.1, desc=False):
 
 
 def learning_wrapper(profile_df, friends_pair, k, c=0.1,
-                     threshold_max=0.10, 
+                     threshold_max=0.10,
                      min_size_group=10,
                      min_delta_f=5,
                      dropout_rate=0.2,
                      max_iter=50,
                      fit_rayleigh=False,
                      n=1000,
-                     verbose=False):
+                     verbose=False,
+                     buffer_group_enabled=True):
     """ learn the groupings and group-wise distance metrics
 
         1. "treshold" is fixed by treshold_max, the larger value will lead
@@ -486,6 +487,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
     n: {integer}, the samples of Rayleigh distribution for ks-test,
         it influence the sensitivity of KS-test
     verbose: {boolean}, display inprocess information
+    buffer_group_enabled: {boolean}, control if allow buffer group
 
     Returns:
     -------
@@ -519,6 +521,15 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
     fs_hist = []       # list of fit scores in sequence (lastest one is the last)
     knowledge_pkg = [] # {index: {"dist_metrics", "fit_group", "buffer_group"}}
     threshold = threshold_max
+
+    if k == 1:
+        # enable buffer group when k=1
+        threshold_find_fit = True
+
+    if buffer_group_enabled:
+        threshold_find_fit = threshold
+    else:
+        threshold_find_fit = 0
 
     # provide initial composition of fit_group  and buffer_group for iterative
     # learning procedure the even size sampling strategy is implemeted here,
@@ -612,8 +623,9 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
         buffer_group_copy = [i for i in buffer_group]
         if len(buffer_group_copy) > 0:
             for uid in buffer_group_copy:
-                new_group, new_pval = find_fit_group(uid, dist_metrics,
-                    profile_df, friend_networkx, threshold, fit_rayleigh=fit_rayleigh)
+                new_group, new_pval = find_fit_group(uid, dist_metrics, \
+                    profile_df, friend_networkx, threshold_find_fit, \
+                    fit_rayleigh)
                 if new_group is not None:
                     buffer_group.remove(uid)
                     # gix = [i for i in fit_group.keys() if i==new_group]
@@ -634,8 +646,9 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
         unfit_group_copy = {k:[i for i in v] for k, v in unfit_group.iteritems()}
         for g, uids in unfit_group_copy.iteritems():
             for uid in uids:
-                new_group, new_pval = find_fit_group(uid, dist_metrics,
-                    profile_df, friend_networkx, threshold, g, fit_rayleigh)
+                new_group, new_pval = find_fit_group(uid, dist_metrics, \
+                    profile_df, friend_networkx, threshold_find_fit, \
+                    g, fit_rayleigh)
                 unfit_group[g].remove(uid)
 
                 if new_pval is None:
