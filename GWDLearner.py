@@ -514,7 +514,7 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
     fit_group    = init_dict_list(k) # members composition in fit groups
     fit_pvals    = init_dict_list(k) # members' pvalue of KStest with their group distance metrics
     unfit_group  = init_dict_list(k) # members is not considerd fit by its group distance metrics
-    unfit_pvals  = init_dict_list(k) # pvalues for members in unfit_group (maybe can be deleted)
+    # unfit_pvals  = init_dict_list(k) # pvalues for members in unfit_group (maybe can be deleted)
     buffer_group = []                # members are not considered having fit
 
     # results container
@@ -524,7 +524,10 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
 
     if k == 1:
         # enable buffer group when k=1
-        threshold_find_fit = True
+        # disable dropout_rate, there is counterpart
+        # to switch members
+        buffer_group_enabled = True
+        dropout_rate = 0
 
     if buffer_group_enabled:
         threshold_find_fit = threshold
@@ -553,9 +556,6 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
     # initiate fit user pvals
     for g, uids in fit_group.iteritems():
         fit_pvals[g] = [0] * len(uids)
-
-    # time counter()
-    durations = []
 
     # iteration meters
     _no_imp_counter = 0
@@ -690,23 +690,23 @@ def learning_wrapper(profile_df, friends_pair, k, c=0.1,
             # effective learning keep the momentum
             _no_imp_counter = 0
         else:
-            # non-substantial improvement
-            _no_imp_counter += 1
             user_dropout_dict = {}
             pval_dropout_dict = {}
-            print "** dropout is activating ...\n"
-            for g, uids in fit_group.iteritems():
-                try:
-                    pvals = fit_pvals[g]
-                    new_uids, new_pvals, dropout_users, dropout_pvals = \
-                        drawDropouts(uids, pvals, dropout_rate, desc=False)
-                    fit_group[g] = list(new_uids)
-                    fit_pvals[g] = list(new_pvals)
-                    user_dropout_dict[g] = dropout_users
-                    pval_dropout_dict[g] = dropout_pvals
-
-                except:
-                    print 'error pop up for dropouting! \n'
+            if dropout_rate > 0:
+                # non-substantial improvement
+                _no_imp_counter += 1
+                print "** dropout is activating ...\n"
+                for g, uids in fit_group.iteritems():
+                    try:
+                        pvals = fit_pvals[g]
+                        new_uids, new_pvals, dropout_users, dropout_pvals = \
+                            drawDropouts(uids, pvals, dropout_rate, desc=False)
+                        fit_group[g] = list(new_uids)
+                        fit_pvals[g] = list(new_pvals)
+                        user_dropout_dict[g] = dropout_users
+                        pval_dropout_dict[g] = dropout_pvals
+                    except:
+                        print 'error pop up for dropouting! \n'
 
             # randomly reassign users to other group
             if len(user_dropout_dict) > 0:
