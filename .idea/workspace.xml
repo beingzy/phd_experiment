@@ -2,8 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="a49a2c9b-ae7a-4ea9-b206-5c4754d56048" name="Default" comment="">
-      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/GWDLearner.py" afterPath="$PROJECT_DIR$/GWDLearner.py" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/beta_test_on_drhuang_dat.ipynb" afterPath="$PROJECT_DIR$/beta_test_on_drhuang_dat.ipynb" />
+      <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.ipynb_checkpoints/late_phase_test_GWDLearner_raiyleigh-checkpoint.ipynb" afterPath="$PROJECT_DIR$/.ipynb_checkpoints/late_phase_test_GWDLearner_raiyleigh-checkpoint.ipynb" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/late_phase_test_GWDLearner_raiyleigh.ipynb" afterPath="$PROJECT_DIR$/late_phase_test_GWDLearner_raiyleigh.ipynb" />
       <change type="MODIFICATION" beforePath="$PROJECT_DIR$/.idea/workspace.xml" afterPath="$PROJECT_DIR$/.idea/workspace.xml" />
     </list>
@@ -352,7 +352,7 @@
     <servers />
   </component>
   <component name="ToolWindowManager">
-    <frame x="61" y="52" width="1250" height="1028" extended-state="4" />
+    <frame x="61" y="52" width="1250" height="1028" extended-state="5" />
     <editor active="true" />
     <layout>
       <window_info id="Terminal" active="false" anchor="bottom" auto_hide="false" internal_type="DOCKED" type="DOCKED" visible="false" weight="0.33" sideWeight="0.5" order="6" side_tool="false" content_ui="tabs" />
