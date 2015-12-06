@@ -1,2 +1,3 @@
 images/*
 *.pyc
+sna_data_processing/data/*
